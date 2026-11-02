@@ -189,6 +189,9 @@ export const quotes = pgTable("quotes", {
   version: integer("version").notNull().default(1),
   parentQuoteId: uuid("parent_quote_id"),
   status: quoteStatus("status").notNull().default("draft"),
+  // What the human typed; kept while lines are unpriced. discount_cents is the
+  // amount the engine applied (0 until totals are complete).
+  requestedDiscountCents: integer("requested_discount_cents").notNull().default(0),
   discountCents: integer("discount_cents").notNull().default(0),
   subtotalCents: integer("subtotal_cents").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),

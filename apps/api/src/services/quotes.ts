@@ -1,0 +1,241 @@
+// Draft quote editing (design §14, §18, §19, §21). Every change runs under a
+// row lock, checks the optimistic lock version, recomputes totals with the
+// engine in the same transaction, and writes an audit event.
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import type { z } from "zod";
+import {
+  type Cents, type QtyMilli, type QuotePatch, type QuoteLineInput, type AddFromPriceBook, type PreviewRequest,
+  formatQtyMilli, parseQtyMilli,
+} from "@qa/shared";
+import { type Db, type Tx, withTenant } from "../db/client.ts";
+import { businesses, customers, jobs, priceBookItems, quoteLines, quotes } from "../db/schema.ts";
+import { computeTotals, previewTotals, type EngineLine } from "./quoteEngine.ts";
+import { expandItem } from "./priceBook.ts";
+import { audit } from "./audit.ts";
+import { AppError, notFound } from "../http/errors.ts";
+import type { TenantCtx } from "../http/context.ts";
+
+type QuoteRow = typeof quotes.$inferSelect;
+type LineRow = typeof quoteLines.$inferSelect;
+
+const DEFAULT_TERMS = "Quote valid for the period shown. Work performed to code; permit and inspection included where listed.";
+
+// A line as the engine and the table both need it.
+interface DraftLine extends EngineLine {
+  description: string;
+  unit: LineRow["unit"];
+  priceBookItemId: string | null;
+  groupKey: string | null;
+  sourceKind: LineRow["sourceKind"];
+  sourceQuote: string | null;
+  extractedSnapshot: unknown;
+}
+
+const fromRow = (l: LineRow): DraftLine => ({
+  description: l.description, qtyMilli: l.qtyMilli as QtyMilli, unit: l.unit,
+  unitPriceCents: l.unitPriceCents as Cents | null, optional: l.optional,
+  priceBookItemId: l.priceBookItemId, groupKey: l.groupKey,
+  sourceKind: l.sourceKind, sourceQuote: l.sourceQuote, extractedSnapshot: l.extractedSnapshot,
+});
+
+export function view(q: QuoteRow, lines: LineRow[]) {
+  const { businessId: _b, snapshot: _s, ...rest } = q;
+  return {
+    ...rest,
+    lines: lines.map((l) => ({
+      id: l.id, description: l.description, qty: formatQtyMilli(l.qtyMilli as QtyMilli), unit: l.unit,
+      unitPriceCents: l.unitPriceCents, lineTotalCents: l.lineTotalCents, priceBookItemId: l.priceBookItemId,
+      needsPrice: l.needsPrice, optional: l.optional, groupKey: l.groupKey, sourceKind: l.sourceKind,
+      sourceQuote: l.sourceQuote,
+    })),
+  };
+}
+export type QuoteView = ReturnType<typeof view>;
+
+async function loadLines(tx: Tx, businessId: string, quoteId: string) {
+  return tx.select().from(quoteLines)
+    .where(and(eq(quoteLines.businessId, businessId), eq(quoteLines.quoteId, quoteId)))
+    .orderBy(asc(quoteLines.sort));
+}
+
+// Explicit tenant filter on every query (§11) — RLS is the second layer, not the only one.
+const quoteOf = (businessId: string, id: string) => and(eq(quotes.businessId, businessId), eq(quotes.id, id));
+
+async function taxesOf(tx: Tx, businessId: string) {
+  const [b] = await tx.select({ taxComponents: businesses.taxComponents }).from(businesses).where(eq(businesses.id, businessId));
+  return b!.taxComponents;
+}
+
+export async function createQuote(db: Db, t: TenantCtx, input: { customerId: string; jobId?: string | undefined }) {
+  return withTenant(db, t.businessId, async (tx) => {
+    const [c] = await tx.select({ id: customers.id }).from(customers)
+      .where(and(eq(customers.businessId, t.businessId), eq(customers.id, input.customerId)));
+    if (!c) throw notFound("customer");
+    if (input.jobId) {
+      const [j] = await tx.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.businessId, t.businessId), eq(jobs.id, input.jobId)));
+      if (!j) throw notFound("job");
+    }
+    // Per-business counter, allocated in this transaction: no gaps on rollback.
+    const [b] = await tx.update(businesses)
+      .set({ nextQuoteNo: sql`${businesses.nextQuoteNo} + 1` })
+      .where(eq(businesses.id, t.businessId))
+      .returning({ number: sql<number>`${businesses.nextQuoteNo} - 1`, depositPct: businesses.depositPctDefault });
+    const [q] = await tx.insert(quotes).values({
+      businessId: t.businessId, customerId: input.customerId, jobId: input.jobId ?? null,
+      number: b!.number, depositPct: b!.depositPct, terms: DEFAULT_TERMS, totalsComplete: true,
+    }).returning();
+    await audit(tx, t.businessId, t.userId, "quote", q!.id, "quote.created", { number: q!.number });
+    return view(q!, []);
+  });
+}
+
+export async function listQuotes(db: Db, t: TenantCtx) {
+  return withTenant(db, t.businessId, (tx) => tx.select({
+    id: quotes.id, number: quotes.number, version: quotes.version, status: quotes.status,
+    customerId: quotes.customerId, customerName: customers.name,
+    totalCents: quotes.totalCents, totalsComplete: quotes.totalsComplete, updatedAt: quotes.updatedAt,
+  }).from(quotes).innerJoin(customers, eq(customers.id, quotes.customerId))
+    .where(eq(quotes.businessId, t.businessId)).orderBy(desc(quotes.updatedAt)));
+}
+
+export async function getQuote(db: Db, t: TenantCtx, id: string) {
+  return withTenant(db, t.businessId, async (tx) => {
+    const [q] = await tx.select().from(quotes).where(quoteOf(t.businessId, id));
+    if (!q) throw notFound("quote");
+    return view(q, await loadLines(tx, t.businessId, id));
+  });
+}
+
+// Shared edit path: lock, check state + version, let the caller produce the new
+// lines/discount/terms, recompute with the engine, store, audit.
+async function editQuote(
+  db: Db, t: TenantCtx, id: string, lockVersion: number, action: string,
+  mutate: (tx: Tx, q: QuoteRow, current: LineRow[]) => Promise<{ lines: DraftLine[]; discountCents: number; terms: string }>,
+) {
+  return withTenant(db, t.businessId, async (tx) => {
+    const [q] = await tx.select().from(quotes).where(quoteOf(t.businessId, id)).for("update");
+    if (!q) throw notFound("quote");
+    if (q.status === "sending") throw new AppError(409, "QUOTE_SENDING", "the quote is being sent; try again in a moment");
+    if (q.status !== "draft" && q.status !== "approved") {
+      throw new AppError(409, "QUOTE_NOT_EDITABLE", `a ${q.status} quote cannot be edited; revise it instead`);
+    }
+    if (lockVersion !== q.lockVersion) {
+      throw new AppError(409, "STALE_QUOTE", "the quote changed since you loaded it", { currentLockVersion: q.lockVersion });
+    }
+
+    const current = await loadLines(tx, t.businessId, id);
+    const next = await mutate(tx, q, current);
+    const taxes = await taxesOf(tx, t.businessId);
+    const cfg = { discountCents: next.discountCents as Cents, taxes };
+
+    const preview = previewTotals(next.lines, cfg);
+    if (preview.discountExceedsSubtotal) {
+      throw new AppError(422, "DISCOUNT_EXCEEDS_SUBTOTAL", "the discount is larger than the priced subtotal");
+    }
+    // Stored totals come only from the strict path; while a line still needs a
+    // price the quote stores zeros and totals_complete = false (§18).
+    const strict = preview.complete ? computeTotals(next.lines, cfg) : null;
+
+    await tx.delete(quoteLines).where(and(eq(quoteLines.businessId, t.businessId), eq(quoteLines.quoteId, id)));
+    if (next.lines.length) {
+      await tx.insert(quoteLines).values(next.lines.map((l, sort) => ({
+        businessId: t.businessId, quoteId: id, sort,
+        description: l.description, qtyMilli: l.qtyMilli, unit: l.unit,
+        unitPriceCents: l.unitPriceCents, needsPrice: l.unitPriceCents === null,
+        lineTotalCents: l.unitPriceCents === null ? null : preview.lines[sort]!.lineTotalCents,
+        priceBookItemId: l.priceBookItemId, optional: l.optional, groupKey: l.groupKey,
+        sourceKind: l.sourceKind, sourceQuote: l.sourceQuote, extractedSnapshot: l.extractedSnapshot,
+      })));
+    }
+
+    const demoted = q.status === "approved";
+    const [updated] = await tx.update(quotes).set({
+      requestedDiscountCents: next.discountCents,
+      discountCents: strict?.discountCents ?? 0,
+      subtotalCents: strict?.subtotalCents ?? 0,
+      taxCents: strict?.taxCents ?? 0,
+      totalCents: strict?.totalCents ?? 0,
+      optionalTotalCents: strict?.optionalTotalCents ?? 0,
+      taxes: strict?.taxes ?? [],
+      totalsComplete: strict !== null,
+      terms: next.terms,
+      lockVersion: q.lockVersion + 1,
+      updatedAt: new Date(),
+      // Editing an approved quote returns it to draft and discards the snapshot (§19).
+      ...(demoted ? { status: "draft" as const, snapshot: null, approvedBy: null, approvedAt: null } : {}),
+    }).where(quoteOf(t.businessId, id)).returning();
+
+    if (demoted) await audit(tx, t.businessId, t.userId, "quote", id, "quote.demoted");
+    await audit(tx, t.businessId, t.userId, "quote", id, action, {
+      before: summarize(current, q), after: summarize(next.lines, updated!, next.discountCents),
+    });
+    return view(updated!, await loadLines(tx, t.businessId, id));
+  });
+}
+
+function summarize(lines: (LineRow | DraftLine)[], q: QuoteRow, discount = q.requestedDiscountCents) {
+  return {
+    lines: lines.map((l) => [l.description, formatQtyMilli(l.qtyMilli as QtyMilli), l.unitPriceCents, l.optional]),
+    discountCents: discount, totalCents: q.totalCents,
+  };
+}
+
+async function toDraftLines(tx: Tx, businessId: string, input: QuoteLineInput[], current: LineRow[]): Promise<DraftLine[]> {
+  const ids = [...new Set(input.map((l) => l.priceBookItemId).filter((x): x is string => !!x))];
+  if (ids.length) {
+    const found = await tx.select({ id: priceBookItems.id }).from(priceBookItems)
+      .where(and(eq(priceBookItems.businessId, businessId), inArray(priceBookItems.id, ids)));
+    if (found.length !== ids.length) throw new AppError(422, "UNKNOWN_PRICE_BOOK_ITEM", "a line refers to an item not in this price book");
+  }
+  const byId = new Map(current.map((l) => [l.id, l]));
+  return input.map((l) => {
+    const prev = l.id ? byId.get(l.id) : undefined;
+    if (l.id && !prev) throw new AppError(422, "UNKNOWN_LINE", "a line id does not belong to this quote");
+    return {
+      description: l.description, qtyMilli: parseQtyMilli(l.qty), unit: l.unit,
+      unitPriceCents: l.unitPriceCents as Cents | null, optional: l.optional,
+      priceBookItemId: l.priceBookItemId, groupKey: l.groupKey,
+      sourceKind: prev?.sourceKind ?? "manual", sourceQuote: prev?.sourceQuote ?? null,
+      extractedSnapshot: prev?.extractedSnapshot ?? null,
+    };
+  });
+}
+
+export async function patchQuote(db: Db, t: TenantCtx, id: string, patch: QuotePatch) {
+  return editQuote(db, t, id, patch.lockVersion, "quote.edited", async (tx, q, current) => ({
+    lines: patch.lines ? await toDraftLines(tx, t.businessId, patch.lines, current) : current.map(fromRow),
+    discountCents: patch.discountCents ?? q.requestedDiscountCents,
+    terms: patch.terms ?? q.terms,
+  }));
+}
+
+export async function addFromPriceBook(db: Db, t: TenantCtx, id: string, input: z.infer<typeof AddFromPriceBook>) {
+  return editQuote(db, t, id, input.lockVersion, "quote.lines_added", async (tx, q, current) => {
+    const expanded = await expandItem(tx, t.businessId, input.priceBookItemId, parseQtyMilli(input.qty));
+    return {
+      lines: [
+        ...current.map(fromRow),
+        ...expanded.map((e) => ({ ...e, optional: false, sourceQuote: null, extractedSnapshot: null })),
+      ],
+      discountCents: q.requestedDiscountCents,
+      terms: q.terms,
+    };
+  });
+}
+
+export async function preview(db: Db, t: TenantCtx, id: string, input: z.infer<typeof PreviewRequest>) {
+  return withTenant(db, t.businessId, async (tx) => {
+    const [q] = await tx.select({ id: quotes.id }).from(quotes).where(quoteOf(t.businessId, id));
+    if (!q) throw notFound("quote");
+    const lines = input.lines.map((l) => ({
+      qtyMilli: parseQtyMilli(l.qty), unitPriceCents: l.unitPriceCents as Cents | null, optional: l.optional,
+    }));
+    const p = previewTotals(lines, { discountCents: input.discountCents as Cents, taxes: await taxesOf(tx, t.businessId) });
+    return {
+      complete: p.complete, unpricedLines: p.unpricedLines, discountExceedsSubtotal: p.discountExceedsSubtotal,
+      lineTotalsCents: p.lines.map((l) => (l.unitPriceCents === null ? null : l.lineTotalCents)),
+      subtotalCents: p.subtotalCents, discountCents: p.discountCents, taxes: p.taxes,
+      taxCents: p.taxCents, totalCents: p.totalCents, optionalTotalCents: p.optionalTotalCents,
+    };
+  });
+}

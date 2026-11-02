@@ -1,0 +1,68 @@
+{
+  "trade": "electrical",
+  "version": 1,
+  "note": "Starter price book (design §12, §22). Rates are blank on purpose: the owner fills in their own. Assembly quantities (including labour hours) are defaults to confirm at onboarding.",
+  "items": [
+    { "key": "labour", "kind": "labour", "name": "Electrician labour", "unit": "hour", "aliases": ["labour", "labor", "hours", "time"] },
+    { "key": "apprentice", "kind": "labour", "name": "Apprentice labour", "unit": "hour", "aliases": ["apprentice", "helper"] },
+    { "key": "callout", "kind": "callout", "name": "Service call — diagnostic (first hour)", "unit": "flat", "aliases": ["service call", "troubleshooting", "come take a look", "diagnose", "breaker keeps tripping", "power keeps going out"] },
+    { "key": "permit", "kind": "fixed_job", "name": "Electrical permit and inspection", "unit": "flat", "aliases": ["permit", "inspection", "esa"] },
+    { "key": "gfci", "kind": "material", "name": "GFCI receptacle, 15 A", "unit": "each", "aliases": ["gfci", "gfi", "safety plug", "plug with the button", "outlet by sink", "bathroom plug"] },
+    { "key": "tr_recep", "kind": "material", "name": "Tamper-resistant receptacle, 15 A", "unit": "each", "aliases": ["plug", "outlet", "receptacle", "socket"] },
+    { "key": "wp_gfci", "kind": "material", "name": "Weatherproof GFCI receptacle (exterior)", "unit": "each", "aliases": ["outdoor outlet", "exterior plug", "deck outlet", "outside plug"] },
+    { "key": "potlight", "kind": "material", "name": "LED pot light, 4\" slim", "unit": "each", "aliases": ["pot light", "recessed light", "can light", "downlight"] },
+    { "key": "switch", "kind": "material", "name": "Single-pole switch", "unit": "each", "aliases": ["switch", "light switch"] },
+    { "key": "dimmer", "kind": "material", "name": "LED dimmer switch", "unit": "each", "aliases": ["dimmer"] },
+    { "key": "smoke_co", "kind": "material", "name": "Hardwired smoke/CO alarm", "unit": "each", "aliases": ["smoke detector", "smoke alarm", "co detector", "carbon monoxide"] },
+    { "key": "brk15", "kind": "material", "name": "Breaker, 15 A single-pole", "unit": "each", "aliases": ["15 amp breaker"] },
+    { "key": "brk40", "kind": "material", "name": "Breaker, 40 A double-pole", "unit": "each", "aliases": ["40 amp breaker"] },
+    { "key": "brk60", "kind": "material", "name": "Breaker, 60 A double-pole", "unit": "each", "aliases": ["60 amp breaker"] },
+    { "key": "nmd14", "kind": "material", "name": "Cable, NMD90 14/2", "unit": "foot", "aliases": ["14/2", "wire", "romex"] },
+    { "key": "nmd6", "kind": "material", "name": "Cable, NMD90 6/3", "unit": "foot", "aliases": ["6/3", "heavy cable"] },
+    { "key": "surge", "kind": "material", "name": "Whole-home surge protector", "unit": "each", "aliases": ["surge protector", "surge"] },
+    { "key": "panel200", "kind": "material", "name": "200 A panel with main breaker", "unit": "each", "aliases": ["panel", "breaker box", "200 amp panel"] },
+    { "key": "fixture_install", "kind": "fixed_job", "name": "Install customer-supplied light fixture", "unit": "each", "aliases": ["hang a light", "install fixture", "chandelier", "ceiling fan"] }
+  ],
+  "assemblies": [
+    {
+      "name": "EV charger install — 48 A Level 2 (charger supplied by customer)",
+      "unit": "each",
+      "aliases": ["ev charger", "car charger", "tesla charger", "level 2 charger", "wall connector"],
+      "components": [
+        { "key": "brk60", "qty": "1" },
+        { "key": "nmd6", "qty": "30" },
+        { "key": "labour", "qty": "4" },
+        { "key": "permit", "qty": "1" }
+      ]
+    },
+    {
+      "name": "Replace receptacle with GFCI",
+      "unit": "each",
+      "aliases": ["swap plug for gfci", "add gfci"],
+      "components": [
+        { "key": "gfci", "qty": "1" },
+        { "key": "labour", "qty": "0.5" }
+      ]
+    },
+    {
+      "name": "New pot light (per light, accessible ceiling)",
+      "unit": "each",
+      "aliases": ["add pot lights", "new recessed lights"],
+      "components": [
+        { "key": "potlight", "qty": "1" },
+        { "key": "nmd14", "qty": "10" },
+        { "key": "labour", "qty": "0.75" }
+      ]
+    },
+    {
+      "name": "Panel upgrade 100 A → 200 A",
+      "unit": "each",
+      "aliases": ["panel upgrade", "service upgrade", "200 amp upgrade"],
+      "components": [
+        { "key": "panel200", "qty": "1" },
+        { "key": "labour", "qty": "10" },
+        { "key": "permit", "qty": "1" }
+      ]
+    }
+  ]
+}

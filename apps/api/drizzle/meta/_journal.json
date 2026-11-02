@@ -15,6 +15,13 @@
       "when": 1793580946966,
       "tag": "0001_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793581541932,
+      "tag": "0002_requested_discount",
+      "breakpoints": true
     }
   ]
 }

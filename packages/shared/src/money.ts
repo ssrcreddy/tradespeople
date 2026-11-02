@@ -32,5 +32,12 @@ export function parseQtyMilli(s: string): QtyMilli {
   return (whole * 1000 + frac) as QtyMilli;
 }
 
+// 1500 → "1.5", 12000 → "12", 1 → "0.001"
+export function formatQtyMilli(q: QtyMilli): string {
+  const whole = Math.trunc(q / 1000);
+  const frac = String(q % 1000).padStart(3, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : String(whole);
+}
+
 // Model output arrives as a JSON number; round it once at the boundary.
 export const toQtyMilli = (qty: number): QtyMilli => Math.round(qty * 1000) as QtyMilli;

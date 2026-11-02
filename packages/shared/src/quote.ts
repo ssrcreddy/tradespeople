@@ -32,6 +32,7 @@ export const PriceBookKind = z.enum(["labour", "material", "callout", "fixed_job
 export const QtyString = z.string().regex(/^\d+(\.\d{1,3})?$/, "quantity must be a decimal with up to 3 places");
 
 export const QuoteLineInput = z.object({
+  id: z.uuid().optional(),                    // existing line: keeps its provenance (source quote, extracted snapshot)
   description: z.string().trim().min(1).max(500),
   qty: QtyString,
   unit: LineUnit,
@@ -49,3 +50,14 @@ export const QuotePatch = z.object({
   terms: z.string().max(4000).optional(),
 });
 export type QuotePatch = z.infer<typeof QuotePatch>;
+
+export const AddFromPriceBook = z.object({
+  lockVersion: z.number().int().nonnegative(),
+  priceBookItemId: z.uuid(),
+  qty: QtyString.default("1"),
+});
+
+export const PreviewRequest = z.object({
+  lines: z.array(QuoteLineInput).max(200),
+  discountCents: int().default(0),
+});

@@ -1,0 +1,1 @@
+ALTER TABLE "quotes" ADD COLUMN "requested_discount_cents" integer DEFAULT 0 NOT NULL;
