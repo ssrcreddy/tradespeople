@@ -1,0 +1,34 @@
+# Local development infrastructure. App services (migrate, api, worker, web)
+# are added on Days 2–5; this file starts with the stateful pieces only.
+name: quotes-agent
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: quotes
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quotes"]
+      interval: 5s
+      retries: 10
+
+  # S3-compatible object storage for local dev. MinIO's official images are no
+  # longer published (community edition went source-only in 2025), so local
+  # dev uses SeaweedFS. Production uses Cloudflare R2 or AWS S3.
+  s3:
+    image: chrislusf/seaweedfs:4.50
+    command: mini -dir=/data -bucket=quotes-dev -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "8333:8333"   # S3 API
+    volumes:
+      - s3-data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
+volumes:
+  db-data:
+  s3-data:

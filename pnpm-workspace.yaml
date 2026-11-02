@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+  - spikes
+
+# Native builds needed by the photo pipeline (sharp ships prebuilt binaries).
+onlyBuiltDependencies:
+  - sharp
+  - esbuild

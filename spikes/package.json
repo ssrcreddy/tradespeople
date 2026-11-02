@@ -1,0 +1,33 @@
+{
+  "name": "@qa/spikes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Day-1 throwaway spikes (design §25). Findings go in README.md; code here is not imported by the apps.",
+  "scripts": {
+    "photo": "node --env-file-if-exists=../.env photo.ts",
+    "pdf": "node --env-file-if-exists=../.env pdf.ts",
+    "schema": "node --env-file-if-exists=../.env schema.ts",
+    "extract": "node --env-file-if-exists=../.env extract.ts",
+    "inbound": "node --env-file-if-exists=../.env inbound.ts",
+    "s3": "node --env-file-if-exists=../.env s3.ts",
+    "sign-test": "node --env-file-if-exists=../.env sign-test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@fontsource/noto-sans": "^5.1.0",
+    "@qa/shared": "workspace:*",
+    "exif-reader": "^2.0.0",
+    "fastify": "^5.2.0",
+    "heic-convert": "^2.1.0",
+    "openai": "^6.0.0",
+    "pdfkit": "^0.17.0",
+    "resend": "^6.0.0",
+    "sharp": "^0.34.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.17.0"
+  }
+}

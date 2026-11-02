@@ -1,0 +1,23 @@
+{
+  "name": "quotes-agent",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "dev:infra": "docker compose -f infra/docker-compose.yml up -d",
+    "spike:photo": "pnpm --filter @qa/spikes photo",
+    "spike:pdf": "pnpm --filter @qa/spikes pdf",
+    "spike:schema": "pnpm --filter @qa/spikes schema",
+    "spike:extract": "pnpm --filter @qa/spikes extract",
+    "spike:inbound": "pnpm --filter @qa/spikes inbound"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
