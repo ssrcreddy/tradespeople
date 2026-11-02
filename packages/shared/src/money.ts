@@ -13,6 +13,16 @@ export const mulQtyRate = (q: QtyMilli, rate: Cents): Cents =>
 export const applyRatePpm = (amount: Cents, r: RatePpm): Cents =>
   Number(divHalfUp(BigInt(amount) * BigInt(r), 1_000_000n)) as Cents;
 
+export const sumCents = (xs: readonly Cents[]): Cents => xs.reduce((a, b) => a + b, 0) as Cents;
+
+// Share of an amount by an integer percentage, half-up.
+export const pctOf = (amount: Cents, pct: number): Cents =>
+  Number(divHalfUp(BigInt(amount) * BigInt(pct), 100n)) as Cents;
+
+// Sell rate from supplier cost + markup (price book materials, §12).
+export const applyMarkup = (cost: Cents, markupPpm: RatePpm): Cents =>
+  (cost + applyRatePpm(cost, markupPpm)) as Cents;
+
 // Parse a decimal string ("1.5", "12", "0.25") to thousandths without floats.
 export function parseQtyMilli(s: string): QtyMilli {
   const m = /^(\d+)(?:\.(\d{1,3}))?$/.exec(s.trim());

@@ -19,7 +19,7 @@ infra/             docker-compose: Postgres 16 + SeaweedFS (local S3)
 ```bash
 pnpm install
 cp .env.example .env          # fill in keys yourself; never commit .env
-pnpm dev:infra                # Postgres on 5432, S3 on 8333
+pnpm dev:infra                # Postgres on 5433, S3 on 8333
 ```
 
 Node 24 is pinned (`.nvmrc`, `engines`); pnpm 10.
