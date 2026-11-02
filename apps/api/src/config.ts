@@ -27,6 +27,7 @@ const Env = z.object({
   LLM_INPUT_USD_PER_MTOK: z.coerce.number().nonnegative().default(2.5),
   LLM_OUTPUT_USD_PER_MTOK: z.coerce.number().nonnegative().default(10),
   LLM_MONTHLY_CAP_USD: z.coerce.number().positive().default(20),
+  FAKE_LLM_FILE: optional,
 });
 
 export type Config = {
@@ -44,6 +45,7 @@ export type Config = {
   openai: { apiKey: string; model: string; temperature: number | undefined } | undefined;
   pricing: { inputUsdPerMTok: number; outputUsdPerMTok: number };
   llmMonthlyCapUsd: number;
+  fakeLlmFile: string | undefined;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -67,5 +69,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       : undefined,
     pricing: { inputUsdPerMTok: e.LLM_INPUT_USD_PER_MTOK, outputUsdPerMTok: e.LLM_OUTPUT_USD_PER_MTOK },
     llmMonthlyCapUsd: e.LLM_MONTHLY_CAP_USD,
+    fakeLlmFile: e.FAKE_LLM_FILE,
   };
 }

@@ -1,0 +1,14 @@
+{
+  "isEnquiry": true,
+  "customer": { "name": "Priya Shah", "email": null, "phone": "647-555-0142", "siteAddress": "14 Elm Street, Oakville" },
+  "jobType": "ev_charger_and_repairs",
+  "summary": "Level 2 EV charger in the garage, swap kitchen receptacle for GFCI, replace 3 flickering pot lights, check doorbell transformer",
+  "urgency": "soon",
+  "lines": [
+    { "description": "EV charger install", "priceBookItemId": null, "qty": 1, "qtyStated": false, "unit": "each", "kind": "assembly", "sourceKind": "text", "sourceQuote": "need a charger put in the garage", "confidence": 0.9 },
+    { "description": "GFCI receptacle", "priceBookItemId": null, "qty": 1, "qtyStated": true, "unit": "each", "kind": "material", "sourceKind": "text", "sourceQuote": "the plug by the kitchen sink doesnt have the safety button thing", "confidence": 0.85 },
+    { "description": "LED pot light", "priceBookItemId": null, "qty": 3, "qtyStated": true, "unit": "each", "kind": "material", "sourceKind": "text", "sourceQuote": "there are 3 pot lights in the living room that flicker", "confidence": 0.8 },
+    { "description": "Doorbell transformer replacement", "priceBookItemId": null, "qty": 1, "qtyStated": false, "unit": "each", "kind": "material", "sourceKind": "text", "sourceQuote": "look at the doorbell transformer", "confidence": 0.6 }
+  ],
+  "questions": ["Is the panel 100 A or 200 A, and how far is it from where the charger will go?"]
+}

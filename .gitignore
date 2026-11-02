@@ -8,3 +8,4 @@ dist/
 # Spike outputs and private samples (real customer photos/messages never get committed)
 spikes/out/
 spikes/samples/private/
+*.tsbuildinfo

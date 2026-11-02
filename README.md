@@ -7,16 +7,20 @@ Design: [Tradespeople Quotes Agent HLD and LLD v1.1.html](Tradespeople%20Quotes%
 ## Repo layout (so far)
 
 ```
-apps/api/          Fastify API (HTTP mode): auth, tenancy, price book, customers, quotes
+apps/api/          Fastify API (src/server.ts) and worker (src/worker.ts) — same code, two modes
   src/services/quoteEngine.ts   pure money engine — the only code that produces totals
+  src/jobs/                     queue handlers: fetch-inbound, extract, notify, stuck-sweep
+  src/llm/prompts/              versioned extraction prompts
   drizzle/                      migrations (0001_rls.sql = row-level security)
+  scripts/eval.ts               golden-set evaluation (pnpm eval)
+apps/web/          Next.js review UI (sign in, onboarding, jobs, quote review)
 packages/shared/   Zod contracts + money.ts integer helpers
 data/trade-packs/  starter price books per trade (electrical)
+data/golden/       evaluation set + dated reports
 spikes/            Day-1 throwaway experiments — not imported by the apps
 infra/             docker-compose: Postgres 16 + SeaweedFS (local S3)
 ```
 
-`apps/web` (Next.js) and the worker arrive later in the build order.
 
 ## Setup
 
@@ -26,7 +30,14 @@ cp .env.example .env          # fill in keys yourself; never commit .env
 pnpm dev:infra                # Postgres on 56432, S3 on 8333
 pnpm migrate                  # creates the "app" role + applies migrations
 pnpm dev:api                  # API on http://localhost:8080
+pnpm dev:worker               # queue worker (extraction, email fetch, notifications)
+pnpm dev:web                  # UI on http://localhost:3000 (proxies /api/auth and /backend to the API)
 ```
+
+Without `OPENAI_API_KEY` + `STRONG_MODEL`, set `FAKE_LLM_FILE=../../data/dev/fake-extraction.json`
+to have the worker answer every extraction with a fixed fixture (development only;
+ignored in production). Without Resend keys, owner notifications are printed by the
+worker instead of emailed, and the inbound webhook is disabled.
 
 Node 24 is pinned (`.nvmrc`, `engines`); pnpm 10. Postgres uses host port
 56432 because native and other-project Postgres instances often hold 5432–5433.
@@ -42,6 +53,35 @@ Integration tests create a throwaway `quotes_test` database. CI
 (`.github/workflows/ci.yml`) runs everything against Postgres on every push,
 plus the isolation suites a second time with RLS bypassed
 (`TEST_BYPASS_RLS=1`) to prove the code-level tenant filters on their own.
+
+## Days 6–10 — status (2026-11-02)
+
+| Area | What exists |
+|---|---|
+| Worker + queue | pg-boss on Postgres; every enqueue is in the same transaction as the change that causes it; a 5-minute stuck-sweep re-drives anything left behind. |
+| Intake | Paste / upload / site notes (`POST /jobs`, multipart); Resend inbound webhook with raw-body signature check, sender allowlist + quarantine, per-business rate limit; body and attachments fetched by the worker. |
+| Photos | HEIC via native libheif (JS fallback), EXIF/GPS stripped, ≤1600 px preview; originals download-only. |
+| Extraction | Versioned prompt, forwarded-header contact hint, validation (fuzzy source quotes, foreign ids nulled, unstated quantities flagged), one retry, spend cap, cost logged per call. |
+| Matching | Catalogue id (sanity-checked) → unique exact name/core name/alias → trigram with a clear lead. Assemblies expand into priced parts; anything else needs a price, with suggestions. |
+| Review screen v1 | Original beside editable lines; source quotes highlighted; sentences no line used are shaded; needs-price / quantity-to-confirm / from-photo flags; suggestions; live totals from the server engine; save with optimistic locking; phone layout with Message/Quote tabs. |
+| Notifications | Owner emails for draft ready, needs info, failed, quarantined, rate-limited, spend cap. |
+
+Exit test: the pipeline-level parts pass — every unpriced line is flagged and
+none guessed, no labour hours are invented, and a worker killed mid-extraction
+loses no job (integration tests). The live part — 15 messy enquiries through the
+real model — needs `OPENAI_API_KEY` + `STRONG_MODEL` in `.env`, then:
+
+```bash
+pnpm eval
+```
+
+Found while running it end to end and fixed: the matcher missed long catalogue
+names ("GFCI receptacle, 15 A") — it now also scores the core name; pasted
+forwards weren't parsed for the customer's address; quoted reply text was being
+dropped; "not used" shading flagged headers and greetings.
+
+Not yet: price-book editing screen and full onboarding (Days 16–21);
+approval, PDF, sending, invoices (Days 11–15).
 
 ## Days 2–5 — status (2026-11-01)
 

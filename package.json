@@ -19,7 +19,8 @@
     "spike:extract": "pnpm --filter @qa/spikes extract",
     "spike:inbound": "pnpm --filter @qa/spikes inbound",
     "eval": "pnpm --filter @qa/api eval",
-    "dev:worker": "pnpm --filter @qa/api worker"
+    "dev:worker": "pnpm --filter @qa/api worker",
+    "dev:web": "pnpm --filter @qa/web dev"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

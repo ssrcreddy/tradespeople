@@ -35,6 +35,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm -r typecheck
+      - name: Build web app
+        run: pnpm --filter @qa/web build
       - name: Unit, property and integration tests (app role, RLS on)
         run: pnpm --filter @qa/api test
       - name: Isolation with RLS bypassed (repository filters alone)

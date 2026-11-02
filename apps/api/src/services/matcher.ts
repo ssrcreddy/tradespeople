@@ -24,6 +24,9 @@ async function score(tx: Tx, businessId: string, query: string): Promise<Scored[
     .then((rows) => rows.sort((a, b) => b.score - a.score));
 }
 
+// Mirrors price_book_core_name() in SQL: "GFCI receptacle, 15 A" → "GFCI receptacle".
+export const coreName = (name: string) => name.split(/\s+[—–-]\s+|\s*[,(]/)[0]!.trim();
+
 export type MatchStage = "catalogue_id" | "alias" | "trigram" | "none";
 
 export interface MatchResult { stage: MatchStage; itemId: string | null; candidates: { id: string; name: string; score: number }[] }
@@ -47,10 +50,11 @@ export async function findMatch(tx: Tx, businessId: string, line: ExtractedLine)
     if (hit && hit.score >= THRESHOLDS.idSanity) return { stage: "catalogue_id", itemId: hit.id, candidates };
   }
 
-  // Stage 2a: exact alias / name hit.
+  // Stage 2a: exact hit on the name, its core name, or an alias.
   const d = normaliseForMatch(line.description);
-  const exact = ranked.find((r) => [r.name, ...r.aliases].some((a) => normaliseForMatch(a) === d));
-  if (exact) return { stage: "alias", itemId: exact.id, candidates };
+  // A core name like "Cable" can be shared by several items: only a unique hit counts.
+  const exact = ranked.filter((r) => [r.name, coreName(r.name), ...r.aliases].some((a) => normaliseForMatch(a) === d));
+  if (exact.length === 1) return { stage: "alias", itemId: exact[0]!.id, candidates };
 
   // Stage 2b: trigram similarity with a clear lead over the runner-up.
   const [top, second] = ranked;

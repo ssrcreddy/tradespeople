@@ -7,7 +7,8 @@ import { createBoss } from "./queue.ts";
 import { s3Store } from "./storage.ts";
 import { resendInbound, type InboundProvider } from "./inbound.ts";
 import { resendMailer, memoryMailer } from "./mail.ts";
-import { openAiProvider, type LlmProvider } from "./llm/gateway.ts";
+import { readFileSync } from "node:fs";
+import { openAiProvider, scriptedProvider, type LlmProvider } from "./llm/gateway.ts";
 import type { Config } from "./config.ts";
 
 const unavailableInbound: InboundProvider = {
@@ -29,6 +30,12 @@ export function buildRuntime(cfg: Config, mode: "http" | "worker") {
     store: s3Store(cfg.s3),
     inbound: cfg.resend?.inboundSecret ? resendInbound(cfg.resend.apiKey, cfg.resend.inboundSecret) : unavailableInbound,
     mailer: cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.sender) : memoryMailer(true),
-    llm: cfg.openai ? openAiProvider(cfg.openai) : unavailableLlm,
+    llm: cfg.openai
+      ? openAiProvider(cfg.openai)
+      // Development only: answer every extraction with a fixed fixture, so the
+      // pipeline and review screen can be exercised without a model key.
+      : cfg.fakeLlmFile && !cfg.production
+        ? scriptedProvider(() => JSON.parse(readFileSync(cfg.fakeLlmFile!, "utf8")), "fake-fixture")
+        : unavailableLlm,
   };
 }

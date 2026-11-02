@@ -37,6 +37,7 @@ export async function buildTestApp() {
     openai: undefined,
     pricing: { inputUsdPerMTok: 2.5, outputUsdPerMTok: 10 },
     llmMonthlyCapUsd: 20,
+    fakeLlmFile: undefined,
   };
   const { db, pool } = createDb(cfg.databaseUrl);
   // Superuser connection for test setup and inspection only (bypasses RLS).

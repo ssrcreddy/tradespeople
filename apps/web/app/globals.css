@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; }
+body { @apply bg-stone-50 text-slate-900 antialiased; }
+
+mark.src { @apply bg-amber-200/70 rounded px-0.5 cursor-pointer; }
+mark.src.active { @apply bg-amber-400; }
+.unused { @apply text-slate-400 italic; }
