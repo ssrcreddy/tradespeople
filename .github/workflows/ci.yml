@@ -1,0 +1,43 @@
+# Design §8: typecheck, unit + property tests, and both isolation suites
+# against a real Postgres on every push. Deploy is a manual tagged release.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      APP_DB_PASSWORD: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r typecheck
+      - name: Unit, property and integration tests (app role, RLS on)
+        run: pnpm --filter @qa/api test
+      - name: Isolation with RLS bypassed (repository filters alone)
+        run: pnpm --filter @qa/api exec vitest run --project integration test/integration/isolation.test.ts test/integration/api.test.ts
+        env:
+          TEST_BYPASS_RLS: "1"
