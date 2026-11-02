@@ -17,7 +17,9 @@
     "spike:pdf": "pnpm --filter @qa/spikes pdf",
     "spike:schema": "pnpm --filter @qa/spikes schema",
     "spike:extract": "pnpm --filter @qa/spikes extract",
-    "spike:inbound": "pnpm --filter @qa/spikes inbound"
+    "spike:inbound": "pnpm --filter @qa/spikes inbound",
+    "eval": "pnpm --filter @qa/api eval",
+    "dev:worker": "pnpm --filter @qa/api worker"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

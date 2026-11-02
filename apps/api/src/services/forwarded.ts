@@ -52,9 +52,9 @@ export function parseForwarded(text: string): ParsedForward {
   if (i > headerStart) body = lines.slice(i).join("\n");
   else if (lastMarker >= 0) body = normalised.slice(start);
 
-  // Drop quoted reply lines and trailing whitespace; keep everything else verbatim
-  // so source quotes still match the stored original.
-  body = body.split("\n").filter((l) => !/^\s*>/.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Unquote reply chains instead of dropping them: in a pasted thread the
+  // quoted part is often where the actual request is ("> Need a charger…").
+  body = body.split("\n").map((l) => l.replace(/^\s*(>\s?)+/, "")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return { contactHint, cleanedText: body.slice(0, MAX_CHARS) };
 }
 

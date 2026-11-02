@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "eval": "node --env-file-if-exists=../../.env scripts/eval.ts",
+    "worker": "node --env-file-if-exists=../../.env --watch src/worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
