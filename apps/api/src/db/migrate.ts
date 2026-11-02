@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { installQueue, SCHEMA } from "../queue.ts";
 
 export async function runMigrations(adminUrl: string, appPassword: string) {
   const pool = new pg.Pool({ connectionString: adminUrl, max: 1 });
@@ -17,6 +18,14 @@ export async function runMigrations(adminUrl: string, appPassword: string) {
       await pool.query(`ALTER ROLE app LOGIN PASSWORD '${pw}' NOSUPERUSER NOBYPASSRLS`);
     }
     await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(new URL("../../drizzle", import.meta.url)) });
+
+    // Job queue schema: installed by the admin role, used by the app role.
+    await installQueue(adminUrl);
+    await pool.query(`GRANT USAGE ON SCHEMA ${SCHEMA} TO app`);
+    await pool.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${SCHEMA} TO app`);
+    await pool.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${SCHEMA} TO app`);
+    await pool.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ${SCHEMA} TO app`);
+    await pool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${SCHEMA} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app`);
   } finally {
     await pool.end();
   }

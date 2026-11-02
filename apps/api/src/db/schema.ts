@@ -8,6 +8,10 @@ import {
 } from "drizzle-orm/pg-core";
 import type { TaxComponent } from "@qa/shared";
 
+// An attachment as stored: the original bytes, plus a resized, metadata-free
+// JPEG for the model and the review screen when it is an image.
+export interface JobFile { key: string; filename: string; contentType: string; sha256: string; size: number; modelKey: string | null }
+
 const id = () => uuid("id").primaryKey().defaultRandom();
 const businessId = () => uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" });
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -173,10 +177,18 @@ export const jobs = pgTable("jobs", {
   inboundMessageId: uuid("inbound_message_id").references(() => inboundMessages.id),
   source: jobSource("source").notNull(),
   originalText: text("original_text").notNull().default(""),
-  originalFiles: jsonb("original_files").$type<{ key: string; sha256: string; contentType: string }[]>().notNull().default([]),
+  originalFiles: jsonb("original_files").$type<JobFile[]>().notNull().default([]),
   providerMessageId: text("provider_message_id").unique(),
   status: jobStatus("status").notNull().default("received"),
+  subject: text("subject"),
+  // Customer contact read deterministically from forwarded headers (§16).
+  contactHint: jsonb("contact_hint").$type<{ name: string | null; email: string | null }>(),
+  // The validated ExtractionResult, kept for review, questions and evals.
+  extraction: jsonb("extraction"),
+  extractionAttempts: integer("extraction_attempts").notNull().default(0),
+  lastError: text("last_error"),
   createdAt: createdAt(),
+  updatedAt: updatedAt(),
 }, (t) => [index("jobs_business_status").on(t.businessId, t.status, t.createdAt)]);
 
 // ---------- quotes ----------
@@ -184,7 +196,8 @@ export const quotes = pgTable("quotes", {
   id: id(),
   businessId: businessId(),
   jobId: uuid("job_id").references(() => jobs.id),   // null for quotes started by hand
-  customerId: uuid("customer_id").notNull().references(() => customers.id),
+  // Nullable: an extracted draft may not know its customer yet; approval requires one.
+  customerId: uuid("customer_id").references(() => customers.id),
   number: integer("number").notNull(),
   version: integer("version").notNull().default(1),
   parentQuoteId: uuid("parent_quote_id"),
@@ -238,6 +251,10 @@ export const quoteLines = pgTable("quote_lines", {
   sourceKind: sourceKind("source_kind").notNull().default("manual"),
   sourceQuote: text("source_quote"),
   extractedSnapshot: jsonb("extracted_snapshot"),
+  // Matcher candidates shown as one-click suggestions in review (§17).
+  suggestions: jsonb("suggestions").$type<{ id: string; name: string; score: number }[]>(),
+  // Labour hours the message did not state and no assembly supplied (§16).
+  qtyToConfirm: boolean("qty_to_confirm").notNull().default(false),
 }, (t) => [
   index("quote_lines_quote").on(t.quoteId, t.sort),
   check("quote_lines_qty", sql`${t.qtyMilli} > 0`),

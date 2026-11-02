@@ -3,14 +3,19 @@ import type pg from "pg";
 import type { Db } from "./db/client.ts";
 import type { Auth } from "./auth.ts";
 import type { Config } from "./config.ts";
+import type { Boss } from "./queue.ts";
+import type { ObjectStore } from "./storage.ts";
+import type { InboundProvider } from "./inbound.ts";
 import { registerErrorHandler, AppError } from "./http/errors.ts";
 import { makeGuards } from "./http/context.ts";
 import { businessRoutes } from "./routes/businesses.ts";
 import { priceBookRoutes } from "./routes/priceBook.ts";
 import { customerRoutes } from "./routes/customers.ts";
 import { quoteRoutes } from "./routes/quotes.ts";
+import { jobRoutes } from "./routes/jobs.ts";
+import { webhookRoutes, inboxRoutes } from "./routes/inbound.ts";
 
-export interface Deps { db: Db; pool: pg.Pool; auth: Auth; cfg: Config }
+export interface Deps { db: Db; pool: pg.Pool; auth: Auth; cfg: Config; boss: Boss; store: ObjectStore; inbound: InboundProvider }
 
 export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
@@ -19,7 +24,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   // CSRF: cookie-authenticated state changes must come from a trusted origin.
   // Better Auth applies its own origin check to /api/auth/*.
   app.addHook("onRequest", async (req) => {
-    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || req.url.startsWith("/api/auth/")) return;
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || req.url.startsWith("/api/auth/") || req.url.startsWith("/webhooks/")) return;
     if (!req.headers.cookie) return;
     const origin = req.headers.origin;
     if (!origin || !deps.cfg.trustedOrigins.includes(origin)) {
@@ -55,5 +60,8 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   await app.register(priceBookRoutes(deps, guards));
   await app.register(customerRoutes(deps, guards));
   await app.register(quoteRoutes(deps, guards));
+  await app.register(jobRoutes(deps, guards));
+  await app.register(inboxRoutes(deps, guards));
+  await app.register(webhookRoutes(deps));
   return app;
 }

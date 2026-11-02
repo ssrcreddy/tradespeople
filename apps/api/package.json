@@ -13,11 +13,18 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@fastify/multipart": "^10.1.6",
     "@qa/shared": "workspace:*",
     "better-auth": "^1.7.15",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
+    "heic-convert": "^2.1.0",
+    "openai": "^6.49.0",
     "pg": "^8.23.1",
+    "pg-boss": "^12.38.0",
+    "resend": "^6.37.0",
+    "sharp": "^0.34.5",
     "zod": "^4.1.0"
   },
   "devDependencies": {

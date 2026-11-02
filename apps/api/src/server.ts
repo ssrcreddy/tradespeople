@@ -1,18 +1,18 @@
-// HTTP mode (design §5, §8). The worker entry point (MODE=worker) arrives with
-// the job queue on Days 6–10.
+// HTTP mode (design §5, §8). The worker runs from the same code: src/worker.ts.
 import { loadConfig } from "./config.ts";
-import { createDb } from "./db/client.ts";
-import { createAuth } from "./auth.ts";
+import { buildRuntime } from "./runtime.ts";
 import { buildApp } from "./app.ts";
 
 const cfg = loadConfig();
-const { db, pool } = createDb(cfg.databaseUrl);
-const auth = createAuth(db, cfg);
-const app = await buildApp({ db, pool, auth, cfg }, { logger: true });
+const rt = buildRuntime(cfg, "http");
+rt.boss.on("error", (e) => console.error(JSON.stringify({ msg: "pg-boss error", error: e.message })));
+await rt.boss.start();
+const app = await buildApp(rt, { logger: true });
 
 const shutdown = async () => {
   await app.close();
-  await pool.end();
+  await rt.boss.stop({ graceful: false });
+  await rt.pool.end();
   process.exit(0);
 };
 process.on("SIGINT", shutdown);

@@ -22,6 +22,20 @@
       "when": 1793581541932,
       "tag": "0002_requested_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793582876525,
+      "tag": "0003_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793582885902,
+      "tag": "0004_intake_functions",
+      "breakpoints": true
     }
   ]
 }
