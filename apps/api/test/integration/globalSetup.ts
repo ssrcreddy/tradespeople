@@ -3,7 +3,7 @@ import pg from "pg";
 import type { TestProject } from "vitest/node";
 import { runMigrations } from "../../src/db/migrate.ts";
 
-const ADMIN = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://postgres:postgres@localhost:5433/postgres";
+const ADMIN = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://postgres:postgres@localhost:56432/postgres";
 const APP_PASSWORD = process.env.APP_DB_PASSWORD ?? "app";
 const DB = "quotes_test";
 

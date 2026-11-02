@@ -7,22 +7,69 @@ Design: [Tradespeople Quotes Agent HLD and LLD v1.1.html](Tradespeople%20Quotes%
 ## Repo layout (so far)
 
 ```
-packages/shared/   Zod contract (extraction schema) + money.ts integer helpers
+apps/api/          Fastify API (HTTP mode): auth, tenancy, price book, customers, quotes
+  src/services/quoteEngine.ts   pure money engine — the only code that produces totals
+  drizzle/                      migrations (0001_rls.sql = row-level security)
+packages/shared/   Zod contracts + money.ts integer helpers
+data/trade-packs/  starter price books per trade (electrical)
 spikes/            Day-1 throwaway experiments — not imported by the apps
 infra/             docker-compose: Postgres 16 + SeaweedFS (local S3)
 ```
 
-`apps/api` and `apps/web` arrive on Days 2–5.
+`apps/web` (Next.js) and the worker arrive later in the build order.
 
 ## Setup
 
 ```bash
 pnpm install
 cp .env.example .env          # fill in keys yourself; never commit .env
-pnpm dev:infra                # Postgres on 5433, S3 on 8333
+pnpm dev:infra                # Postgres on 56432, S3 on 8333
+pnpm migrate                  # creates the "app" role + applies migrations
+pnpm dev:api                  # API on http://localhost:8080
 ```
 
-Node 24 is pinned (`.nvmrc`, `engines`); pnpm 10.
+Node 24 is pinned (`.nvmrc`, `engines`); pnpm 10. Postgres uses host port
+56432 because native and other-project Postgres instances often hold 5432–5433.
+`BETTER_AUTH_SECRET` in `.env` must be at least 32 characters.
+
+## Tests
+
+```bash
+pnpm test                     # unit + property + integration (needs pnpm dev:infra)
+```
+
+Integration tests create a throwaway `quotes_test` database. CI
+(`.github/workflows/ci.yml`) runs everything against Postgres on every push,
+plus the isolation suites a second time with RLS bypassed
+(`TEST_BYPASS_RLS=1`) to prove the code-level tenant filters on their own.
+
+## Days 2–5 — status (2026-11-01)
+
+Exit test passed: two seeded businesses cannot see each other's data through
+any endpoint or via raw SQL as the app role, and a hand-built quote with an
+assembly, a discount and GST + QST totals correctly to the cent ($885.13).
+
+| Area | What exists |
+|---|---|
+| Quote engine | Integer cents + milli-quantities, per-line half-up, tax components in ppm, discount bound, optional lines, preview, deposit split. 24 tests, ~37k property cases. |
+| Data model | All §12 tables. RLS on every tenant table (fails closed when the tenant is unset), append-only audit for the app role, DB checks for the totals identity and discount bound. |
+| Auth + tenancy | Better Auth email/password; tenant from the session; every query filters `business_id` *and* runs under RLS. Origin check on cookie writes. |
+| Price book | Items, cost + markup, assemblies priced as the sum of parts, deactivate-not-delete, electrical starter template. |
+| Quotes | Per-business numbers, line editing with row lock + optimistic `lockVersion`, engine recompute in the same transaction, assembly expansion, preview totals, audit trail. |
+| Not yet | Approval/sending, PDFs, invoices (Days 11–15); intake/extraction (Days 6–10); email verification + magic link (Days 16–21). |
+
+### API (so far)
+
+| Route | |
+|---|---|
+| `POST /api/auth/sign-up/email`, `/api/auth/sign-in/email`, … | Better Auth |
+| `POST /businesses` | onboarding: create business, become owner |
+| `GET / PATCH /settings/business` | tax components, terms, deposit default, allowlist… |
+| `GET / POST /price-book`, `POST /price-book/starter`, `PATCH / DELETE /price-book/:id` | price book + assemblies |
+| `GET / POST /customers`, `GET / PATCH /customers/:id` | customers (email or phone required) |
+| `GET / POST /quotes`, `GET / PATCH /quotes/:id` | draft quotes (PATCH needs `lockVersion`) |
+| `POST /quotes/:id/lines/from-price-book` | add an item or expand an assembly |
+| `POST /quotes/:id/preview-totals` | live totals, writes nothing |
 
 ## Day 1 — spike results (2026-11-01)
 
