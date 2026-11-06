@@ -12,7 +12,7 @@
     "test": "pnpm --filter @qa/api test",
     "migrate": "pnpm --filter @qa/api migrate",
     "dev:api": "pnpm --filter @qa/api dev",
-    "dev:infra": "docker compose -f infra/docker-compose.yml up -d",
+    "dev:infra": "docker compose -f infra/docker-compose.yml --env-file .env up -d",
     "spike:photo": "pnpm --filter @qa/spikes photo",
     "spike:pdf": "pnpm --filter @qa/spikes pdf",
     "spike:schema": "pnpm --filter @qa/spikes schema",
