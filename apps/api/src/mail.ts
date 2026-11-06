@@ -43,7 +43,8 @@ export function memoryMailer(log = false) {
       sent.push(m);
       const id = `mem_${sent.length}_${Date.now()}`;
       if (m.idempotencyKey) byKey.set(m.idempotencyKey, id);
-      if (log) console.log(`[mail] to=${m.to} subject="${m.subject}" attachments=${m.attachments?.length ?? 0}`);
+      // Development has no inbox, so print the message: sign-in links are in the text.
+      if (log) console.log(`[mail] to=${m.to} subject="${m.subject}" attachments=${m.attachments?.length ?? 0}\n${m.text}`);
       return { id };
     },
   };

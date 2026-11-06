@@ -90,6 +90,21 @@ describe("price book", () => {
     expect(list.find((i: { id: string }) => i.id === asm.body.id).assemblyPriceCents).toBe(6500 + 13500 + 40000);
   });
 
+  it("a partial edit changes only what was sent", async () => {
+    const it1 = (await c.req("POST", "/price-book", { kind: "material", name: "Plug", description: "Desc", unit: "each", rateCents: 500, aliases: ["outlet", "receptacle"] })).body;
+    const r = await c.req("PATCH", `/price-book/${it1.id}`, { rateCents: 600 });
+    expect(r.body).toMatchObject({ name: "Plug", description: "Desc", rateCents: 600, aliases: ["outlet", "receptacle"], unit: "each" });
+    const r2 = await c.req("PATCH", `/price-book/${it1.id}`, { aliases: ["socket"] });
+    expect(r2.body).toMatchObject({ rateCents: 600, aliases: ["socket"], description: "Desc" });
+  });
+
+  it("typing a sell rate overrides cost + markup; changing the cost recomputes it", async () => {
+    const m = (await c.req("POST", "/price-book", { kind: "material", name: "Wire", unit: "foot", costCents: 100, markupPpm: 500_000 })).body;
+    expect(m.rateCents).toBe(150);
+    expect((await c.req("PATCH", `/price-book/${m.id}`, { costCents: 200 })).body).toMatchObject({ rateCents: 300, markupPpm: 500_000 });
+    expect((await c.req("PATCH", `/price-book/${m.id}`, { rateCents: 275 })).body).toMatchObject({ rateCents: 275, markupPpm: null, costCents: 200 });
+  });
+
   it("rejects nested and empty assemblies", async () => {
     const asm = (await c.req("GET", "/price-book")).body.find((i: { kind: string }) => i.kind === "assembly");
     const nested = await c.req("POST", "/price-book", { kind: "assembly", name: "Nested", unit: "each", components: [{ componentId: asm.id, qty: "1" }] });
@@ -123,6 +138,9 @@ describe("customers", () => {
     const c = await signUpWithBusiness(t.app, "cust");
     expect((await c.req("POST", "/customers", { name: "No contact" })).body.error.code).toBe("NO_CUSTOMER_CONTACT");
     expect((await c.req("POST", "/customers", { name: "Phone only", phone: "647-555-0142" })).status).toBe(201);
+    const k = (await c.req("POST", "/customers", { name: "Keep", email: "keep@example.com", phone: "555-0100", siteAddress: "1 Main St" })).body;
+    expect((await c.req("PATCH", `/customers/${k.id}`, { name: "Kept" })).body)
+      .toMatchObject({ name: "Kept", email: "keep@example.com", phone: "555-0100", siteAddress: "1 Main St" });
     await c.req("POST", "/customers", { name: "A", email: "Same@Example.com" });
     expect((await c.req("POST", "/customers", { name: "B", email: "same@example.com" })).status).toBe(409);
   });

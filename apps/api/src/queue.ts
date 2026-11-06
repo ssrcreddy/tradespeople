@@ -14,6 +14,8 @@ export const Q = {
   sendDocument: "send-document",
   invoiceReminder: "invoice-reminder",
   expirySweep: "expiry-sweep",
+  exportBusiness: "export-business",
+  deleteBusiness: "delete-business",
 } as const;
 export type QueueName = (typeof Q)[keyof typeof Q];
 
@@ -26,6 +28,8 @@ const QUEUE_OPTIONS: Record<QueueName, Parameters<PgBoss["createQueue"]>[1]> = {
   [Q.sendDocument]: { retryLimit: 3, retryDelay: 30, retryBackoff: true, expireInSeconds: 120, deadLetter: Q.sendFailed },
   [Q.invoiceReminder]: { retryLimit: 2, retryDelay: 300, expireInSeconds: 120 },
   [Q.expirySweep]: { retryLimit: 0, expireInSeconds: 120 },
+  [Q.exportBusiness]: { retryLimit: 2, retryDelay: 60, expireInSeconds: 600 },
+  [Q.deleteBusiness]: { retryLimit: 5, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 },
 };
 
 export const SCHEMA = "pgboss";

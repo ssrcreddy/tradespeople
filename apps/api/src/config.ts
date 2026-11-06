@@ -30,6 +30,10 @@ const Env = z.object({
   LLM_MONTHLY_CAP_USD: z.coerce.number().positive().default(20),
   FAKE_LLM_FILE: optional,
   SENTRY_DSN: optional,
+  DATABASE_ADMIN_URL: optional,
+  VAPID_PUBLIC_KEY: optional,
+  VAPID_PRIVATE_KEY: optional,
+  VAPID_CONTACT: z.string().default("mailto:support@example.com"),
 });
 
 export type Config = {
@@ -49,6 +53,9 @@ export type Config = {
   llmMonthlyCapUsd: number;
   fakeLlmFile: string | undefined;
   sentryDsn: string | undefined;
+  adminDatabaseUrl: string | undefined;
+  requireEmailVerification: boolean;
+  vapid: { publicKey: string; privateKey: string; contact: string } | undefined;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -74,5 +81,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     llmMonthlyCapUsd: e.LLM_MONTHLY_CAP_USD,
     fakeLlmFile: e.FAKE_LLM_FILE,
     sentryDsn: e.SENTRY_DSN,
+    adminDatabaseUrl: e.DATABASE_ADMIN_URL,
+    requireEmailVerification: !!e.RESEND_API_KEY,
+    vapid: e.VAPID_PUBLIC_KEY && e.VAPID_PRIVATE_KEY
+      ? { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, contact: e.VAPID_CONTACT }
+      : undefined,
   };
 }

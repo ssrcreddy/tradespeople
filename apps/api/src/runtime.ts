@@ -9,6 +9,7 @@ import { resendInbound, type InboundProvider } from "./inbound.ts";
 import { resendMailer, memoryMailer } from "./mail.ts";
 import { readFileSync } from "node:fs";
 import { openAiProvider, scriptedProvider, type LlmProvider } from "./llm/gateway.ts";
+import { noPush, webPushSender } from "./push.ts";
 import type { Config } from "./config.ts";
 
 const unavailableInbound: InboundProvider = {
@@ -25,12 +26,13 @@ const unavailableLlm: LlmProvider = {
 export function buildRuntime(cfg: Config, mode: "http" | "worker") {
   const { db, pool } = createDb(cfg.databaseUrl);
   const boss = createBoss(cfg.databaseUrl, { worker: mode === "worker" });
+  const mailer = cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.sender) : memoryMailer(true);
   return {
-    cfg, db, pool, boss,
-    auth: createAuth(db, cfg),
+    cfg, db, pool, boss, mailer,
+    auth: createAuth(db, cfg, mailer),
+    push: cfg.vapid ? webPushSender(cfg.vapid) : noPush,
     store: s3Store(cfg.s3),
     inbound: cfg.resend?.inboundSecret ? resendInbound(cfg.resend.apiKey, cfg.resend.inboundSecret, cfg.resend.eventsSecret) : unavailableInbound,
-    mailer: cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.sender) : memoryMailer(true),
     llm: cfg.openai
       ? openAiProvider(cfg.openai)
       // Development only: answer every extraction with a fixed fixture, so the

@@ -25,6 +25,7 @@
     "better-auth": "^1.7.15",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
+    "fflate": "^0.8.3",
     "heic-convert": "^2.1.0",
     "openai": "^6.49.0",
     "pdfkit": "^0.17.2",
@@ -32,11 +33,13 @@
     "pg-boss": "^12.38.0",
     "resend": "^6.37.0",
     "sharp": "^0.34.5",
+    "web-push": "^3.6.7",
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.11",
     "fast-check": "^4.10.2",
     "vitest": "^5.0.5"

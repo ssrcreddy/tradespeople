@@ -12,6 +12,7 @@ import { stuckSweep } from "./jobs/stuckSweep.ts";
 import { sendDocument, sendFailed } from "./jobs/sendDocument.ts";
 import { invoiceReminder } from "./jobs/invoiceReminder.ts";
 import { expirySweep } from "./jobs/expirySweep.ts";
+import { exportBusiness, deleteBusinessJob } from "./jobs/exportDelete.ts";
 
 export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: object) => void = (m, e) => console.log(JSON.stringify({ msg: m, ...e }))) {
   const wrap = <T extends object>(name: string, fn: (d: WorkerDeps, data: T) => Promise<unknown>) =>
@@ -34,6 +35,8 @@ export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: obj
   await d.boss.work(Q.sendFailed, { batchSize: 1 }, wrap(Q.sendFailed, sendFailed));
   await d.boss.work(Q.invoiceReminder, { batchSize: 1 }, wrap(Q.invoiceReminder, invoiceReminder));
   await d.boss.work(Q.expirySweep, { batchSize: 1 }, wrap(Q.expirySweep, (dd) => expirySweep(dd)));
+  await d.boss.work(Q.exportBusiness, { batchSize: 1 }, wrap(Q.exportBusiness, exportBusiness));
+  await d.boss.work(Q.deleteBusiness, { batchSize: 1 }, wrap(Q.deleteBusiness, deleteBusinessJob));
 }
 
 if (process.argv[1]?.endsWith("worker.ts")) {
@@ -44,7 +47,8 @@ if (process.argv[1]?.endsWith("worker.ts")) {
   await rt.boss.start();
   const deps: WorkerDeps = {
     db: rt.db, pool: rt.pool, boss: rt.boss, store: rt.store, inbound: rt.inbound, llm: rt.llm,
-    pricing: cfg.pricing, mailer: rt.mailer, webOrigin: cfg.webOrigin, llmMonthlyCapUsd: cfg.llmMonthlyCapUsd,
+    pricing: cfg.pricing, mailer: rt.mailer, push: rt.push, adminDatabaseUrl: cfg.adminDatabaseUrl,
+    webOrigin: cfg.webOrigin, llmMonthlyCapUsd: cfg.llmMonthlyCapUsd,
   };
   await startWorkers(deps);
   await rt.boss.schedule(Q.stuckSweep, "*/5 * * * *");

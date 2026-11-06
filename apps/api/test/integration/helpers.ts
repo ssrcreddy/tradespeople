@@ -9,6 +9,8 @@ import { createBoss, Q, type QueueName } from "../../src/queue.ts";
 import { memoryStore } from "../../src/storage.ts";
 import { fakeInbound } from "../../src/inbound.ts";
 import { memoryMailer } from "../../src/mail.ts";
+import { memoryPush } from "../../src/push.ts";
+import { exportBusiness, deleteBusinessJob } from "../../src/jobs/exportDelete.ts";
 import { scriptedProvider, type ModelRequest } from "../../src/llm/gateway.ts";
 import type { WorkerDeps } from "../../src/jobs/deps.ts";
 import { fetchInbound } from "../../src/jobs/fetchInbound.ts";
@@ -21,7 +23,7 @@ import { expirySweep } from "../../src/jobs/expirySweep.ts";
 
 export const ORIGIN = "http://localhost:3000";
 
-export async function buildTestApp() {
+export async function buildTestApp(opts: { requireEmailVerification?: boolean } = {}) {
   const cfg: Config = {
     // Normally the non-owner app role, so RLS applies. TEST_BYPASS_RLS=1 connects
     // as the superuser instead (RLS off) to prove the repositories' explicit
@@ -42,6 +44,9 @@ export async function buildTestApp() {
     llmMonthlyCapUsd: 20,
     fakeLlmFile: undefined,
     sentryDsn: undefined,
+    adminDatabaseUrl: inject("adminUrl"),
+    requireEmailVerification: opts.requireEmailVerification ?? false,
+    vapid: undefined,
   };
   const { db, pool } = createDb(cfg.databaseUrl);
   // Superuser connection for test setup and inspection only (bypasses RLS).
@@ -56,13 +61,16 @@ export async function buildTestApp() {
   let script: (req: ModelRequest, call: number) => unknown = () => { throw new Error("no LLM script set"); };
   const llm = scriptedProvider((req, call) => script(req, call));
 
-  const app = await buildApp({ db, pool, auth: createAuth(db, cfg), cfg, boss, store, inbound });
+  const push = memoryPush();
+  const app = await buildApp({ db, pool, auth: createAuth(db, cfg, mailer), cfg, boss, store, inbound, push });
   const worker: WorkerDeps = {
-    db, pool, boss, store, inbound, llm, pricing: cfg.pricing, mailer, webOrigin: ORIGIN, llmMonthlyCapUsd: cfg.llmMonthlyCapUsd,
+    db, pool, boss, store, inbound, llm, pricing: cfg.pricing, mailer, push, adminDatabaseUrl: cfg.adminDatabaseUrl,
+    webOrigin: ORIGIN, llmMonthlyCapUsd: cfg.llmMonthlyCapUsd,
   };
   const handlers: Record<QueueName, (d: WorkerDeps, data: any) => Promise<unknown>> = {
     [Q.fetchInbound]: fetchInbound, [Q.extract]: extract, [Q.notify]: notify, [Q.stuckSweep]: (d) => stuckSweep(d),
     [Q.sendDocument]: sendDocument, [Q.sendFailed]: sendFailed, [Q.invoiceReminder]: invoiceReminder, [Q.expirySweep]: (d) => expirySweep(d),
+    [Q.exportBusiness]: exportBusiness, [Q.deleteBusiness]: deleteBusinessJob,
   };
 
   // Runs every queued job of the given queues (in order) until none are left —
@@ -86,7 +94,7 @@ export async function buildTestApp() {
   }
 
   return {
-    app, db, pool, admin, boss, store, inbound, mailer, llm, worker, drain,
+    app, db, pool, admin, boss, store, inbound, mailer, llm, push, worker, drain,
     setScript: (fn: typeof script) => { script = fn; },
     close: async () => { await app.close(); await boss.stop({ graceful: false }); await pool.end(); await admin.end(); },
   };

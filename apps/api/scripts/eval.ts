@@ -17,6 +17,7 @@ import { createDb } from "../src/db/client.ts";
 import { createBoss, Q } from "../src/queue.ts";
 import { memoryStore } from "../src/storage.ts";
 import { memoryMailer } from "../src/mail.ts";
+import { noPush } from "../src/push.ts";
 import { openAiProvider, scriptedProvider } from "../src/llm/gateway.ts";
 import { createBusiness } from "../src/services/businesses.ts";
 import { loadStarter } from "../src/services/priceBook.ts";
@@ -63,7 +64,7 @@ const llm = args.fake || !cfg.openai
   ? scriptedProvider(() => ({ isEnquiry: true, customer: { name: null, email: null, phone: null, siteAddress: null }, jobType: "x", summary: "x", urgency: "unknown", lines: [], questions: ["(fake model)"] }), "fake")
   : openAiProvider(cfg.openai);
 const deps: WorkerDeps = {
-  db, pool, boss, store, llm, mailer: memoryMailer(), pricing: cfg.pricing, webOrigin: cfg.webOrigin,
+  db, pool, boss, store, llm, mailer: memoryMailer(), push: noPush, adminDatabaseUrl: adminUrl, pricing: cfg.pricing, webOrigin: cfg.webOrigin,
   llmMonthlyCapUsd: 1_000_000, inbound: { verify: () => null, verifyDelivery: () => null, fetch: async () => { throw new Error("n/a"); } },
 };
 

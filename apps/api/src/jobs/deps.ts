@@ -5,6 +5,7 @@ import type { ObjectStore } from "../storage.ts";
 import type { InboundProvider } from "../inbound.ts";
 import type { LlmProvider, Pricing } from "../llm/gateway.ts";
 import type { Mailer } from "../mail.ts";
+import type { PushSender } from "../push.ts";
 
 export interface WorkerDeps {
   db: Db;
@@ -15,6 +16,8 @@ export interface WorkerDeps {
   llm: LlmProvider;
   pricing: Pricing;
   mailer: Mailer;
+  push: PushSender;
+  adminDatabaseUrl: string | undefined;
   webOrigin: string;
   llmMonthlyCapUsd: number;
 }

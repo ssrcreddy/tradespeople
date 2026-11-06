@@ -6,6 +6,7 @@ import type { Config } from "./config.ts";
 import type { Boss } from "./queue.ts";
 import type { ObjectStore } from "./storage.ts";
 import type { InboundProvider } from "./inbound.ts";
+import type { PushSender } from "./push.ts";
 import { registerErrorHandler, AppError } from "./http/errors.ts";
 import { makeGuards } from "./http/context.ts";
 import { businessRoutes } from "./routes/businesses.ts";
@@ -16,7 +17,7 @@ import { jobRoutes } from "./routes/jobs.ts";
 import { webhookRoutes, inboxRoutes } from "./routes/inbound.ts";
 import { invoiceRoutes } from "./routes/invoices.ts";
 
-export interface Deps { db: Db; pool: pg.Pool; auth: Auth; cfg: Config; boss: Boss; store: ObjectStore; inbound: InboundProvider }
+export interface Deps { db: Db; pool: pg.Pool; auth: Auth; cfg: Config; boss: Boss; store: ObjectStore; inbound: InboundProvider; push: PushSender }
 
 export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });

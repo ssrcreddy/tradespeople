@@ -50,6 +50,7 @@ async function seed(biz: string, label: string) {
     await c.query(`insert into usage_counters(business_id, month) values ($1, date_trunc('month', current_date))`, [biz]);
     await c.query(`insert into email_events(business_id, document_id, provider_id, type) values ($1, $2, 'p', 'delivered')`, [biz, quote]);
     await c.query(`insert into email_suppressions(business_id, email, reason) values ($1, 'x@example.com', 'bounce')`, [biz]);
+    await c.query(`insert into push_subscriptions(business_id, user_id, endpoint, p256dh, auth) values ($1, $2, 'https://push.example/1', 'k', 'a')`, [biz, user]);
   });
 }
 

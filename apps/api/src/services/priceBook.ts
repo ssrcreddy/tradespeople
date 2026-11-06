@@ -28,7 +28,18 @@ export const ItemInput = z.object({
   aliases: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
   components: z.array(ComponentInput).max(30).optional(),
 });
-export const ItemPatch = ItemInput.partial().omit({ kind: true });
+// Spelled out, not ItemInput.partial(): in Zod 4 a default inside an optional
+// still applies, so a partial schema would blank every field the client omitted.
+export const ItemPatch = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  description: z.string().max(1000).nullable().optional(),
+  unit: LineUnit.optional(),
+  rateCents: cents().nullable().optional(),
+  costCents: cents().nullable().optional(),
+  markupPpm: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  aliases: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+  components: z.array(ComponentInput).max(30).optional(),
+});
 type ItemInput = z.infer<typeof ItemInput>;
 
 type Item = typeof priceBookItems.$inferSelect;
@@ -77,9 +88,11 @@ export async function updateItem(db: Db, t: TenantCtx, id: string, patch: z.infe
     if (!cur) throw notFound("price book item");
     const { components, ...fields } = patch;
     if (components && cur.kind !== "assembly") throw new AppError(422, "NOT_ASSEMBLY", "only assemblies have components");
-    const merged = { ...cur, ...fields };
+    // Typing a sell rate overrides cost + markup, which would otherwise recompute it.
+    const direct = fields.rateCents !== undefined && fields.costCents === undefined && fields.markupPpm === undefined;
+    const merged = { ...cur, ...fields, ...(direct ? { markupPpm: null } : {}) };
     await tx.update(priceBookItems)
-      .set({ ...fields, rateCents: resolveRate(merged), updatedAt: new Date() })
+      .set({ ...fields, ...(direct ? { markupPpm: null } : {}), rateCents: resolveRate(merged), updatedAt: new Date() })
       .where(and(inBiz(t.businessId), eq(priceBookItems.id, id)));
     if (components) await writeComponents(tx, t.businessId, id, components);
     await audit(tx, t.businessId, t.userId, "price_book_item", id, "price_book.updated", patch);

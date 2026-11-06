@@ -69,4 +69,14 @@ export async function updateSettings(db: Db, t: TenantCtx, patch: z.infer<typeof
   });
 }
 
+// A leaked address can be replaced; the old one stops working at once.
+export async function rotateIntakeToken(db: Db, t: TenantCtx) {
+  if (t.role !== "owner") throw new AppError(403, "OWNER_ONLY", "only the owner can change the intake address");
+  return withTenant(db, t.businessId, async (tx) => {
+    const [b] = await tx.update(businesses).set({ intakeToken: newIntakeToken() }).where(eq(businesses.id, t.businessId)).returning();
+    await audit(tx, t.businessId, t.userId, "business", t.businessId, "intake_token.rotated");
+    return b!;
+  });
+}
+
 export const intakeAddress = (token: string, domain: string) => `quote+${token}@${domain}`;

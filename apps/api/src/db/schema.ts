@@ -98,6 +98,9 @@ export const businesses = pgTable("businesses", {
   depositPctDefault: integer("deposit_pct_default").notNull().default(0),
   // Approved quotes per month (Solo = 20); null = unlimited (Pro).
   monthlyQuoteLimit: integer("monthly_quote_limit").default(20),
+  lastExportKey: text("last_export_key"),
+  lastExportAt: timestamp("last_export_at", { withTimezone: true }),
+  deletionRequestedAt: timestamp("deletion_requested_at", { withTimezone: true }),
   collapseAssemblies: boolean("collapse_assemblies").notNull().default(true),
   nextQuoteNo: integer("next_quote_no").notNull().default(1),
   nextInvoiceNo: integer("next_invoice_no").notNull().default(1),
@@ -375,9 +378,20 @@ export const emailSuppressions = pgTable("email_suppressions", {
   createdAt: createdAt(),
 }, (t) => [primaryKey({ columns: [t.businessId, t.email] })]);
 
+// Web Push endpoints, per device (§22).
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: id(),
+  businessId: businessId(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: createdAt(),
+}, (t) => [unique("push_endpoint").on(t.businessId, t.endpoint)]);
+
 // Tables that get an RLS policy keyed on app.business_id (businesses uses id).
 export const TENANT_TABLES = [
   "memberships", "customers", "price_book_items", "assembly_components", "inbound_messages", "jobs",
   "quotes", "quote_lines", "invoices", "payments", "audit_events", "llm_calls", "notifications",
-  "usage_counters", "email_events", "email_suppressions",
+  "usage_counters", "email_events", "email_suppressions", "push_subscriptions",
 ] as const;

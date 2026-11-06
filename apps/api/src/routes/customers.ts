@@ -17,7 +17,13 @@ const CustomerInput = z.object({
   phone: z.string().trim().min(3).max(40).nullable().default(null),
   siteAddress: z.string().trim().max(400).nullable().default(null),
 });
-const CustomerPatch = CustomerInput.partial();
+// Not CustomerInput.partial(): Zod 4 would apply the defaults and blank omitted fields.
+const CustomerPatch = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  email: z.email().nullable().optional(),
+  phone: z.string().trim().min(3).max(40).nullable().optional(),
+  siteAddress: z.string().trim().max(400).nullable().optional(),
+});
 
 // Explicit tenant filter on every query (§11) — RLS is the second layer, not the only one.
 const customerOf = (businessId: string, id: string) => and(eq(customers.businessId, businessId), eq(customers.id, id));

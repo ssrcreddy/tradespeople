@@ -7,7 +7,7 @@ import { memberships, notifications } from "../db/schema.ts";
 import { enqueue, Q, type Boss } from "../queue.ts";
 
 export type NotifyKind = "draft_ready" | "needs_info" | "extraction_failed" | "quarantined" | "rate_limited" | "spend_cap"
-  | "send_failed" | "bounced" | "quote_expired";
+  | "send_failed" | "bounced" | "quote_expired" | "export_ready";
 
 export async function notifyOwners(boss: Boss, tx: Tx, businessId: string, kind: NotifyKind, entityId: string) {
   const owners = await tx.select({ userId: memberships.userId }).from(memberships)
