@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+.git
+.env
+.env.*
+spikes/out
+spikes/samples/private
+data/golden/reports
+*.html

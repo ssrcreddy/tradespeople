@@ -43,3 +43,15 @@ jobs:
         run: pnpm --filter @qa/api exec vitest run --project integration test/integration/isolation.test.ts test/integration/api.test.ts test/integration/documents.test.ts -t "solation|A cannot|Day 5"
         env:
           TEST_BYPASS_RLS: "1"
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API and web images
+        run: |
+          docker build --target api -t quotes-api .
+          docker build --target web -t quotes-web .
+      - name: The API image has native HEIC decoding
+        run: docker run --rm quotes-api sh -c 'command -v heif-convert'

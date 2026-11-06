@@ -99,6 +99,18 @@ export default function Review() {
   const remove = (key: string) => { setLines((ls) => ls.filter((l) => l.key !== key)); setDirty(true); };
   const removeGroup = (g: string) => { setLines((ls) => ls.filter((l) => l.groupKey !== g)); setDirty(true); };
   const addLine = () => { setLines((ls) => [...ls, toLine({ description: "", qty: "1", unit: "each", unitPriceCents: null, priceBookItemId: null, optional: false, groupKey: null, qtyToConfirm: false, suggestions: null, sourceQuote: null, sourceKind: "manual" })]); setDirty(true); };
+  // Pricing an unmatched line teaches the book: the customer's words become an alias (§17).
+  const addToBook = async (l: Line) => {
+    const rateCents = parseDollars(l.price);
+    if (typeof rateCents !== "number") return;
+    setError(null);
+    try {
+      const alias = l.sourceQuote && l.sourceQuote.length <= 80 ? [l.sourceQuote] : [];
+      const item = await api<BookItem>("/price-book", { method: "POST", json: { kind: "material", name: l.description.trim(), unit: l.unit, rateCents, aliases: alias } });
+      setBook((b) => [...b, item]);
+      update(l.key, { priceBookItemId: item.id, suggestions: null });
+    } catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't add it to the price book"); }
+  };
   const pick = (key: string, itemId: string) => {
     const it = book.find((b) => b.id === itemId);
     if (it) update(key, { priceBookItemId: it.id, description: it.name, unit: it.unit, price: dollarsOf(it.rateCents), suggestions: null });
@@ -210,6 +222,9 @@ export default function Review() {
                           {l.suggestions.map((s) => <button key={s.id} className="rounded border px-1.5 py-0.5 hover:bg-slate-50" onClick={() => pick(l.key, s.id)}>{s.name}</button>)}
                         </span>
                       ) : null}
+                      {!l.priceBookItemId && typeof parseDollars(l.price) === "number" && l.description.trim() && (
+                        <button className="rounded border px-1.5 py-0.5 text-teal-700 hover:bg-slate-50" onClick={() => addToBook(l)}>Add to price book</button>
+                      )}
                       {!l.priceBookItemId && book.length > 0 && (
                         <select aria-label="Price from book" className="rounded border px-1 py-0.5" value="" onChange={(e) => e.target.value && pick(l.key, e.target.value)}>
                           <option value="">Price from book…</option>

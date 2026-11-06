@@ -10,9 +10,11 @@ export function Shell({ children, title }: { children: React.ReactNode; title?: 
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex items-center justify-between py-4">
         <Link href="/jobs" className="font-semibold tracking-tight">Quotes</Link>
-        <nav className="flex gap-4 text-sm text-slate-600">
+        <nav className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-sm text-slate-600">
           <Link href="/jobs">Jobs</Link>
           <Link href="/invoices">Invoices</Link>
+          <Link href="/price-book">Price book</Link>
+          <Link href="/settings">Settings</Link>
           <button onClick={async () => { await fetch("/api/auth/sign-out", { method: "POST" }); location.href = "/login"; }}>Sign out</button>
         </nav>
       </header>

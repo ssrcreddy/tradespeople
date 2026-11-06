@@ -54,6 +54,39 @@ Integration tests create a throwaway `quotes_test` database. CI
 plus the isolation suites a second time with RLS bypassed
 (`TEST_BYPASS_RLS=1`) to prove the code-level tenant filters on their own.
 
+## Run the whole product in Docker
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file .env --profile app up --build
+```
+
+This starts Postgres, S3, migrations, API, worker and web, with the UI on
+http://localhost:3000. `infra/e2e.env` runs a throwaway copy beside the dev stack:
+
+```bash
+docker compose -p quotes-e2e -f infra/docker-compose.yml --env-file infra/e2e.env --profile app up -d --build
+```
+
+For a real deployment, set `PUBLIC_URL`, `BETTER_AUTH_SECRET`, `POSTGRES_PASSWORD`,
+`APP_DB_PASSWORD` and the provider keys, and point `DOCKER_S3_ENDPOINT` at R2/S3.
+Generate push keys once with `npx web-push generate-vapid-keys`.
+
+## Days 16–21 — status (2026-11-05)
+
+| Area | What exists |
+|---|---|
+| Onboarding | Business + tax → rates table on the electrical starter → first draft from a pasted enquiry, ending on the review screen. |
+| Price book screen | Inline rates and aliases, cost + markup, assemblies with editable parts and labour hours, add and remove. Review offers "Add to price book" for a line priced by hand. |
+| Settings and inbox | Tax registration numbers, terms, deposit default, allowlist, intake address rotation, phone notifications, export, delete; held email with release. |
+| Dashboard | Jobs page leads with drafts, held email, overdue invoices and quotes waiting on the customer. |
+| Sign-in | Password, magic link, password reset. Email verification is required as soon as `RESEND_API_KEY` is set. In dev, links print in the API's log. |
+| Export and delete | Zip of CSVs and every PDF; deletion needs the typed name and a fresh export or waiver, then removes all rows and files using the privileged role. |
+| PWA | Installable, share target handled in the service worker (Android; iOS doesn't support it, so iPhone users paste or upload), Web Push when VAPID keys are set. |
+| Docker | One image for API + worker with native libheif, one for web, `--profile app` stack. |
+
+Still needs real accounts or people: `pnpm eval` against the real model, a real
+inbound and outbound email run, and a pilot completing a real quote unaided.
+
 ## Days 11–15 — status (2026-11-05)
 
 Quote and invoice lifecycle end to end. All status changes go through the two
@@ -118,7 +151,6 @@ names ("GFCI receptacle, 15 A") — it now also scores the core name; pasted
 forwards weren't parsed for the customer's address; quoted reply text was being
 dropped; "not used" shading flagged headers and greetings.
 
-Not yet: price-book editing screen and full onboarding (Days 16–21).
 
 ## Days 2–5 — status (2026-11-01)
 

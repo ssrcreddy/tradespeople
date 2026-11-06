@@ -1,19 +1,28 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, money } from "@/lib/api";
 import { ErrorNote, Shell, btnPrimary, input, useAuthRedirect } from "@/components/Shell";
 import { StatusChip } from "@/components/JobBits";
+import { InvoiceChip, type InvoiceRow } from "@/components/InvoiceBits";
 
+interface QuoteRow { id: string; number: number; status: string; customerName: string | null; totalCents: number }
 interface JobRow { id: string; source: string; status: string; subject: string | null; createdAt: string; customerName: string | null; quoteId: string | null }
 
 export default function Jobs() {
   const onAuth = useAuthRedirect();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<QuoteRow[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [held, setHeld] = useState(0);
 
   const load = useCallback(async () => {
-    try { setJobs(await api<JobRow[]>("/jobs")); }
+    try {
+      setJobs(await api<JobRow[]>("/jobs"));
+      const [q, i, h] = await Promise.all([api<QuoteRow[]>("/quotes"), api<InvoiceRow[]>("/invoices"), api<unknown[]>("/inbox/quarantine")]);
+      setQuotes(q); setInvoices(i); setHeld(h.length);
+    }
     catch (e) { if (!onAuth(e)) setError((e as Error).message); }
   }, [onAuth]);
   useEffect(() => { load(); }, [load]);
@@ -25,12 +34,39 @@ export default function Jobs() {
   }, [jobs, load]);
 
   const attention = jobs?.filter((j) => ["draft_ready", "needs_info", "extraction_failed"].includes(j.status)) ?? [];
+  const waiting = quotes.filter((q) => q.status === "sent");
+  const overdue = invoices.filter((i) => i.overdue);
   return (
     <Shell>
       <div className="grid gap-6 md:grid-cols-[1fr_380px]">
         <section>
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Needs your attention</h2>
+          {held > 0 && <p className="mb-2 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800"><Link className="underline" href="/inbox">{held} email{held > 1 ? "s" : ""} held from unknown senders</Link></p>}
           <JobList jobs={attention} empty="Nothing waiting. New enquiries appear here as drafts." />
+          {overdue.length > 0 && (
+            <>
+              <h2 className="mb-2 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Overdue invoices</h2>
+              <ul className="divide-y rounded-lg border bg-white">
+                {overdue.map((i) => (
+                  <li key={i.id}><Link href={`/invoices/${i.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm hover:bg-slate-50">
+                    <span className="truncate">{i.ref} · {i.customerName}</span><span className="flex items-center gap-2 tabular-nums">{money(i.balanceCents)}<InvoiceChip row={i} /></span>
+                  </Link></li>
+                ))}
+              </ul>
+            </>
+          )}
+          {waiting.length > 0 && (
+            <>
+              <h2 className="mb-2 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Waiting on the customer</h2>
+              <ul className="divide-y rounded-lg border bg-white">
+                {waiting.map((q) => (
+                  <li key={q.id}><Link href={`/quotes/${q.id}/review`} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm hover:bg-slate-50">
+                    <span className="truncate">Q-{String(q.number).padStart(4, "0")} · {q.customerName ?? "No customer"}</span><span className="tabular-nums">{money(q.totalCents)}</span>
+                  </Link></li>
+                ))}
+              </ul>
+            </>
+          )}
           <h2 className="mb-2 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">All jobs</h2>
           <JobList jobs={jobs ?? []} empty={jobs ? "No jobs yet." : "Loading…"} />
           <ErrorNote error={error} />
