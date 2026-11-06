@@ -55,6 +55,16 @@
       ]
     },
     {
+      "name": "New dedicated circuit, 15 A (up to 50 ft)",
+      "unit": "each",
+      "aliases": ["new circuit", "dedicated circuit", "15 amp circuit", "15a circuit"],
+      "components": [
+        { "key": "brk15", "qty": "1" },
+        { "key": "nmd14", "qty": "50" },
+        { "key": "labour", "qty": "2" }
+      ]
+    },
+    {
       "name": "Panel upgrade 100 A → 200 A",
       "unit": "each",
       "aliases": ["panel upgrade", "service upgrade", "200 amp upgrade"],

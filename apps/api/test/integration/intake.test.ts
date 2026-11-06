@@ -205,6 +205,28 @@ describe("guards on what the model returns", () => {
     expect(q.lines[0]).toMatchObject({ qty: "1", qtyToConfirm: true });
   });
 
+  it("keeps the model's catalogue id when a long description only mentions the item", async () => {
+    t.setScript((req) => {
+      const id = catalogueOf(req).find((c) => c.name.startsWith("EV charger"))!.id;
+      return result({ lines: [line({
+        description: "Install Level 2 EV charger in detached garage, about 60 ft from the house panel, with new feeder",
+        priceBookItemId: id, kind: "assembly", sourceQuote: "need a level 2 charger in the detached garage",
+      })] });
+    });
+    const jobId = await pasteJob("We need a level 2 charger in the detached garage");
+    await t.drain(Q.extract, Q.notify);
+    const q = (await A.req("GET", `/quotes/${(await A.req("GET", `/jobs/${jobId}`)).body.quoteId}`)).body;
+    expect(q.lines.map((l: any) => l.priceBookItemId)).toEqual([ids.brk, ids.cable, ids.lab]);
+  });
+
+  it("drops a catalogue id that has nothing to do with the line", async () => {
+    t.setScript(() => result({ lines: [line({ description: "Hot tub hookup", priceBookItemId: ids.gfci, sourceQuote: "hook up the hot tub" })] }));
+    const jobId = await pasteJob("Can you hook up the hot tub");
+    await t.drain(Q.extract, Q.notify);
+    const q = (await A.req("GET", `/quotes/${(await A.req("GET", `/jobs/${jobId}`)).body.quoteId}`)).body;
+    expect(q.lines[0]).toMatchObject({ priceBookItemId: null, needsPrice: true });
+  });
+
   it("a catalogue id from another business is ignored, not matched", async () => {
     const B = await signUpWithBusiness(t.app, "intake-b");
     const bItem = (await B.req("POST", "/price-book", { kind: "material", name: "Secret B part", unit: "each", rateCents: 1 })).body;

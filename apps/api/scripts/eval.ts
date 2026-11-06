@@ -28,7 +28,7 @@ import type { TenantCtx } from "../src/http/context.ts";
 
 interface Case {
   id: string; source: "paste" | "site_notes"; text: string; hoursStated?: boolean;
-  expect: { outcome: string; customerEmail?: string; lines?: string[]; mustAsk?: boolean; forbidDescriptions?: string[]; noMatchedLines?: boolean };
+  expect: { outcome: string; customerEmail?: string; lines?: string[]; allow?: string[]; mustAsk?: boolean; forbidDescriptions?: string[]; noMatchedLines?: boolean };
 }
 
 const { values: args } = parseArgs({ options: { repeats: { type: "string", default: "3" }, only: { type: "string" }, fake: { type: "boolean", default: false } } });
@@ -80,7 +80,9 @@ for (const [prefix, cents] of Object.entries(SAMPLE_RATES)) {
 
 interface Run {
   caseId: string; repeat: number; pass: boolean; outcome: string; failures: string[];
-  expected: number; missing: number; falsePrices: number; inventedHours: number; retried: boolean; costUsd: number;
+  expected: number; missing: number; falsePrices: number; labourPlaceholders: number; inventedHours: number; retried: boolean; costUsd: number;
+  // What the model said and what the matcher did with it, for diagnosing failures.
+  detail: { extracted: unknown; lines: { description: string; qty: number; item: string | null; group: string | null }[]; questions: string[] };
 }
 
 const matchesAny = (name: string | null, pattern: string) => !!name && pattern.split("|").some((p) => name.startsWith(p));
@@ -94,7 +96,7 @@ for (const c of cases) {
 
     const { rows: [j] } = await admin.query(`select status, extraction from jobs where id = $1`, [job.id]);
     const { rows: lines } = await admin.query(
-      `select l.description, l.qty_milli, l.unit, l.price_book_item_id, l.source_kind, l.group_key, p.name as item_name
+      `select l.description, l.qty_milli, l.unit, l.price_book_item_id, l.source_kind, l.group_key, l.qty_to_confirm, p.name as item_name, p.kind as item_kind
          from quote_lines l join quotes q on q.id = l.quote_id left join price_book_items p on p.id = l.price_book_item_id
         where q.job_id = $1 order by l.sort`, [job.id]);
     const { rows: [cust] } = await admin.query(
@@ -112,8 +114,18 @@ for (const c of cases) {
     const missing = outcome === "draft_ready" ? expected.filter((p) => !covered(p)) : [];
     if (missing.length) failures.push(`missing ${missing.join(", ")}`);
 
-    const falsePriced = lines.filter((l) => l.price_book_item_id && !expected.some((p) =>
-      matchesAny(l.item_name, p) || matchesAny(l.group_key?.split(":").slice(1).join(":") ?? null, p)));
+    // Prompt rule 6: unstated hours become 1 hour, flagged "to confirm" on the
+    // review screen. The item is right and the quantity is a labelled
+    // placeholder, so these are counted on their own, not as false prices.
+    const placeholder = (l: (typeof lines)[number]) =>
+      l.item_kind === "labour" && l.source_kind !== "assembly" && l.qty_milli === 1000 && l.qty_to_confirm;
+    const labourPlaceholders = lines.filter(placeholder);
+    const okPatterns = [...expected, ...(c.expect.allow ?? [])];
+    const fits = (l: (typeof lines)[number]) => okPatterns.some((p) =>
+      matchesAny(l.item_name, p) || matchesAny(l.group_key?.split(":").slice(1).join(":") ?? null, p));
+    // An assembly counts as a whole: if one part fits, its labour and cable do too.
+    const fitGroups = new Set(lines.filter((l) => l.group_key && fits(l)).map((l) => l.group_key));
+    const falsePriced = lines.filter((l) => l.price_book_item_id && !placeholder(l) && !fits(l) && !fitGroups.has(l.group_key));
     if (falsePriced.length) failures.push(`unexpected matches ${falsePriced.map((l) => l.item_name).join(", ")}`);
     if (c.expect.noMatchedLines && lines.some((l) => l.price_book_item_id)) failures.push("matched lines for an out-of-trade job");
 
@@ -128,8 +140,12 @@ for (const c of cases) {
 
     runs.push({
       caseId: c.id, repeat: r, pass: failures.length === 0, outcome, failures,
-      expected: expected.length, missing: missing.length, falsePrices: falsePriced.length, inventedHours: invented.length,
+      expected: expected.length, missing: missing.length, falsePrices: falsePriced.length, labourPlaceholders: labourPlaceholders.length, inventedHours: invented.length,
       retried: calls.n > 1, costUsd: calls.cost,
+      detail: {
+        extracted: j.extraction?.lines ?? [], questions,
+        lines: lines.map((l) => ({ description: l.description, qty: l.qty_milli / 1000, item: l.item_name, group: l.group_key })),
+      },
     });
     console.log(`${failures.length ? "FAIL" : "pass"} ${c.id} #${r} ${outcome}${failures.length ? " — " + failures.join("; ") : ""}`);
   }
@@ -147,6 +163,7 @@ const metrics = {
   casesPassingAllRepeats: casePass,
   missRate: sum((r) => r.expected) ? sum((r) => r.missing) / sum((r) => r.expected) : 0,
   falsePrices: sum((r) => r.falsePrices),
+  labourPlaceholders: sum((r) => r.labourPlaceholders),
   inventedHours: sum((r) => r.inventedHours),
   validWithoutRetry: runs.filter((r) => !r.retried).length / runs.length,
   runToRunDisagreements: disagreements,
@@ -163,6 +180,7 @@ const md = [
   `| Cases passing every repeat | ${casePass}/${metrics.cases} | — |`,
   `| Miss rate | ${(metrics.missRate * 100).toFixed(1)}% | ≤10% |`,
   `| False prices | ${metrics.falsePrices} | 0 |`,
+  `| Labour placeholders (1 h, flagged to confirm) | ${metrics.labourPlaceholders} | report |`,
   `| Invented hours | ${metrics.inventedHours} | 0 |`,
   `| Valid without retry | ${(metrics.validWithoutRetry * 100).toFixed(0)}% | ≥90% |`,
   `| Run-to-run disagreements | ${disagreements} | report |`,

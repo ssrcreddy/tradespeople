@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Golden set v1 (design §24). Invented but realistic; replace and extend with anonymised pilot messages (target 50+). 'expect.lines' lists price-book items (by name prefix, from the electrical starter pack) that must be matched; 'mustAsk' cases pass only if the model asks instead of guessing. Hours are never stated unless 'hoursStated' is true.",
+  "note": "Golden set v1 (design §24). Invented but realistic; replace and extend with anonymised pilot messages (target 50+). 'expect.lines' lists price-book items (by name prefix, from the electrical starter pack) that must be matched; 'expect.allow' lists items that are a fair match but not required. 'mustAsk' cases pass only if the model asks instead of guessing. Hours are never stated unless 'hoursStated' is true.",
   "cases": [
     {
       "id": "01-forwarded-ev-gfci-pots",
@@ -36,7 +36,7 @@
       "id": "06-site-notes",
       "source": "site_notes",
       "text": "Kowalski - 88 Birch Cres. Kitchen reno. 6x pot lights over island + perimeter, 2 GFCI at counter, 1 dimmer for pots, new 15A circuit for microwave. Permit needed. Customer wants start Nov 20.",
-      "expect": { "outcome": "draft_ready", "lines": ["LED pot light|New pot light", "GFCI", "LED dimmer", "Breaker, 15 A", "Electrical permit"] }
+      "expect": { "outcome": "draft_ready", "lines": ["LED pot light|New pot light", "GFCI", "LED dimmer", "New dedicated circuit|Breaker, 15 A", "Electrical permit"] }
     },
     {
       "id": "07-typos-smoke-alarms",
@@ -91,7 +91,7 @@
       "id": "15-french-names",
       "source": "paste",
       "text": "Bonjour, c'est Hélène Côté. Pouvez-vous installer 2 prises GFCI dans la salle de bain et une lumière extérieure? Merci! helene.cote@example.ca",
-      "expect": { "outcome": "draft_ready", "customerEmail": "helene.cote@example.ca", "lines": ["GFCI"] }
+      "expect": { "outcome": "draft_ready", "customerEmail": "helene.cote@example.ca", "lines": ["GFCI"], "allow": ["Install customer-supplied light fixture"] }
     }
   ]
 }

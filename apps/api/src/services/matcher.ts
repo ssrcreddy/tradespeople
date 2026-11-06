@@ -10,15 +10,20 @@ import { normaliseForMatch } from "./extraction.ts";
 import type { DraftLine } from "./quotes.ts";
 
 // Tuned on the golden set (§24) — change only with an eval run.
-export const THRESHOLDS = { match: 0.6, lead: 0.1, suggest: 0.35, idSanity: 0.3, showCandidate: 0.15 } as const;
+export const THRESHOLDS = { match: 0.6, lead: 0.1, suggest: 0.35, idSanity: 0.3, idMention: 0.6, showCandidate: 0.15 } as const;
 
-interface Scored { id: string; name: string; kind: string; unit: DraftLine["unit"]; rateCents: number | null; aliases: string[]; score: number }
+interface Scored { id: string; name: string; kind: string; unit: DraftLine["unit"]; rateCents: number | null; aliases: string[]; score: number; mention: number }
 
 async function score(tx: Tx, businessId: string, query: string): Promise<Scored[]> {
   return tx.select({
     id: priceBookItems.id, name: priceBookItems.name, kind: priceBookItems.kind, unit: priceBookItems.unit,
     rateCents: priceBookItems.rateCents, aliases: priceBookItems.aliases,
     score: sql<number>`price_book_similarity(${priceBookItems.name}, ${priceBookItems.aliases}, ${query})`,
+    // How well the core name or an alias appears inside the text. Whole-string
+    // similarity falls as the model's description gets longer; this doesn't.
+    mention: sql<number>`greatest(
+      word_similarity(lower(price_book_core_name(${priceBookItems.name})), lower(${query})),
+      coalesce((select max(word_similarity(lower(a), lower(${query}))) from unnest(${priceBookItems.aliases}) a), 0))`,
   }).from(priceBookItems)
     .where(and(eq(priceBookItems.businessId, businessId), eq(priceBookItems.active, true)))
     .then((rows) => rows.sort((a, b) => b.score - a.score));
@@ -37,7 +42,8 @@ export async function findMatch(tx: Tx, businessId: string, line: ExtractedLine)
   const best = new Map<string, Scored>();
   for (const s of [...byDescription, ...byQuote]) {
     const prev = best.get(s.id);
-    if (!prev || s.score > prev.score) best.set(s.id, s);
+    if (!prev || s.score > prev.score) best.set(s.id, { ...s, mention: Math.max(s.mention, prev?.mention ?? 0) });
+    else if (s.mention > prev.mention) prev.mention = s.mention;
   }
   const ranked = [...best.values()].sort((a, b) => b.score - a.score);
   const candidates = ranked.filter((r) => r.score >= THRESHOLDS.showCandidate).slice(0, 3)
@@ -47,7 +53,9 @@ export async function findMatch(tx: Tx, businessId: string, line: ExtractedLine)
   // business's active item, and lexically sane (the model can pick a wrong id).
   if (line.priceBookItemId) {
     const hit = best.get(line.priceBookItemId);
-    if (hit && hit.score >= THRESHOLDS.idSanity) return { stage: "catalogue_id", itemId: hit.id, candidates };
+    if (hit && (hit.score >= THRESHOLDS.idSanity || hit.mention >= THRESHOLDS.idMention)) {
+      return { stage: "catalogue_id", itemId: hit.id, candidates };
+    }
   }
 
   // Stage 2a: exact hit on the name, its core name, or an alias.
