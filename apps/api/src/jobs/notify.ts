@@ -13,6 +13,9 @@ const SUBJECTS: Record<NotifyKind, (biz: string) => string> = {
   quarantined: () => "Email held from an unknown sender",
   rate_limited: () => "Too many emails to your intake address this hour",
   spend_cap: () => "Monthly AI limit reached",
+  send_failed: () => "A document could not be sent",
+  bounced: () => "An email to a customer bounced",
+  quote_expired: () => "A quote has expired",
 };
 
 function body(kind: NotifyKind, link: string) {
@@ -23,12 +26,19 @@ function body(kind: NotifyKind, link: string) {
     case "quarantined": return `An email reached your intake address from a sender you haven't approved. Review it here:\n${link}`;
     case "rate_limited": return `Your intake address received more emails than usual in the last hour. Extra messages are held here:\n${link}`;
     case "spend_cap": return `This month's AI limit is reached, so new enquiries are waiting. Manage it here:\n${link}`;
+    case "send_failed": return `We couldn't send this document after several tries. Nothing was delivered. Try again or share the PDF yourself:\n${link}`;
+    case "bounced": return `A document you sent was not delivered: the customer's mail server rejected it, and that address is now blocked. Check it here:\n${link}`;
+    case "quote_expired": return `A quote passed its expiry date without an answer:\n${link}`;
   }
 }
 
 function linkFor(kind: NotifyKind, entityId: string, web: string) {
   if (kind === "quarantined" || kind === "rate_limited") return `${web}/inbox`;
   if (kind === "spend_cap") return `${web}/settings`;
+  // Document events use "<quote|invoice>:<id>[:suffix]" so a retry can notify again.
+  const [doc, id] = entityId.split(":");
+  if (doc === "quote") return `${web}/quotes/${id}/review`;
+  if (doc === "invoice") return `${web}/invoices/${id}`;
   return `${web}/jobs/${entityId}`;
 }
 

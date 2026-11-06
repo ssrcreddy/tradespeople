@@ -96,6 +96,8 @@ export const businesses = pgTable("businesses", {
   termsDays: integer("terms_days").notNull().default(14),
   quoteExpiryDays: integer("quote_expiry_days").notNull().default(30),
   depositPctDefault: integer("deposit_pct_default").notNull().default(0),
+  // Approved quotes per month (Solo = 20); null = unlimited (Pro).
+  monthlyQuoteLimit: integer("monthly_quote_limit").default(20),
   collapseAssemblies: boolean("collapse_assemblies").notNull().default(true),
   nextQuoteNo: integer("next_quote_no").notNull().default(1),
   nextInvoiceNo: integer("next_invoice_no").notNull().default(1),
@@ -218,11 +220,17 @@ export const quotes = pgTable("quotes", {
   approvedBy: text("approved_by"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   snapshot: jsonb("snapshot"),
+  // The accepted version when the customer opted in to optional lines (§19);
+  // the sent snapshot stays exactly as sent.
+  acceptedSnapshot: jsonb("accepted_snapshot"),
+  usageCounted: boolean("usage_counted").notNull().default(false),
   pdfObjectKey: text("pdf_object_key"),
   pdfSha256: text("pdf_sha256"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   sentVia: sentVia("sent_via"),
   providerEmailId: text("provider_email_id"),
+  lastSendError: text("last_send_error"),
+  outcomeAt: timestamp("outcome_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
@@ -279,8 +287,11 @@ export const invoices = pgTable("invoices", {
   pdfSha256: text("pdf_sha256"),
   providerEmailId: text("provider_email_id"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  sentVia: sentVia("sent_via"),
+  lastSendError: text("last_send_error"),
   remindersSent: integer("reminders_sent").notNull().default(0),
   createdAt: createdAt(),
+  updatedAt: updatedAt(),
 }, (t) => [
   unique("invoices_quote_kind").on(t.quoteId, t.kind),
   unique("invoices_number").on(t.businessId, t.number),
@@ -356,9 +367,17 @@ export const emailEvents = pgTable("email_events", {
   createdAt: createdAt(),
 });
 
+// Addresses that bounced or complained: never emailed again by this business (§12).
+export const emailSuppressions = pgTable("email_suppressions", {
+  businessId: businessId(),
+  email: text("email").notNull(),                     // always lower-case
+  reason: text("reason").notNull(),
+  createdAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.businessId, t.email] })]);
+
 // Tables that get an RLS policy keyed on app.business_id (businesses uses id).
 export const TENANT_TABLES = [
   "memberships", "customers", "price_book_items", "assembly_components", "inbound_messages", "jobs",
   "quotes", "quote_lines", "invoices", "payments", "audit_events", "llm_calls", "notifications",
-  "usage_counters", "email_events",
+  "usage_counters", "email_events", "email_suppressions",
 ] as const;

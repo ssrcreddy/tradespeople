@@ -19,15 +19,26 @@ export interface InboundEmail {
   raw: unknown;          // full provider response, stored for audit
 }
 
+export interface DeliveryEvent {
+  providerEmailId: string;
+  type: "delivered" | "bounced" | "complained" | "opened";
+  recipient: string | null;
+}
+
 export interface InboundProvider {
   // Throws when the signature is invalid. Returns null for events we ignore.
   verify(rawBody: string, headers: Record<string, string | string[] | undefined>): InboundEvent | null;
+  verifyDelivery(rawBody: string, headers: Record<string, string | string[] | undefined>): DeliveryEvent | null;
   fetch(providerMessageId: string): Promise<InboundEmail>;
 }
 
+const DELIVERY: Record<string, DeliveryEvent["type"]> = {
+  "email.delivered": "delivered", "email.bounced": "bounced", "email.complained": "complained", "email.opened": "opened",
+};
+
 const h = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
-export function resendInbound(apiKey: string, webhookSecret: string): InboundProvider {
+export function resendInbound(apiKey: string, webhookSecret: string, eventsSecret: string | undefined): InboundProvider {
   const resend = new Resend(apiKey);
   return {
     verify(rawBody, headers) {
@@ -39,6 +50,18 @@ export function resendInbound(apiKey: string, webhookSecret: string): InboundPro
       if (event.type !== "email.received") return null;
       const d = event.data as { email_id: string; from: string; to: string[]; received_for?: string[]; subject: string };
       return { providerMessageId: d.email_id, from: d.from, to: [...d.to, ...(d.received_for ?? [])], subject: d.subject ?? "" };
+    },
+    verifyDelivery(rawBody, headers) {
+      if (!eventsSecret) throw new Error("RESEND_EVENTS_SECRET is not set");
+      const event = resend.webhooks.verify({
+        payload: rawBody,
+        headers: { id: h(headers["svix-id"]), timestamp: h(headers["svix-timestamp"]), signature: h(headers["svix-signature"]) },
+        webhookSecret: eventsSecret,
+      });
+      const type = DELIVERY[event.type];
+      if (!type) return null;
+      const d = event.data as { email_id: string; to?: string[] };
+      return { providerEmailId: d.email_id, type, recipient: d.to?.[0] ?? null };
     },
     async fetch(id) {
       const { data: email, error } = await resend.emails.receiving.get(id);
@@ -65,6 +88,12 @@ export function fakeInbound(emails: Map<string, InboundEmail> = new Map()): Inbo
       const e = JSON.parse(rawBody) as { type: string; data: { email_id: string; from: string; to: string[]; subject?: string } };
       if (e.type !== "email.received") return null;
       return { providerMessageId: e.data.email_id, from: e.data.from, to: e.data.to, subject: e.data.subject ?? "" };
+    },
+    verifyDelivery(rawBody, headers) {
+      if (h(headers["x-fake-signature"]) !== "valid") throw new Error("invalid signature");
+      const e = JSON.parse(rawBody) as { type: string; data: { email_id: string; to?: string[] } };
+      const type = DELIVERY[e.type];
+      return type ? { providerEmailId: e.data.email_id, type, recipient: e.data.to?.[0] ?? null } : null;
     },
     async fetch(id) {
       const e = emails.get(id);

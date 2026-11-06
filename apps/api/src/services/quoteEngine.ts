@@ -99,3 +99,15 @@ export function splitDeposit(t: Pick<Totals, "totalCents" | "taxCents">, pct: nu
     balanceTaxCents: (t.taxCents - depositTax) as Cents,
   };
 }
+
+// A deposit's tax, split across components: each takes its pro-rata share and
+// the largest absorbs any rounding cent, so the parts sum to depositTaxCents.
+export function splitTaxes<T extends { amountCents: number }>(taxes: readonly T[], pct: number, depositTaxCents: number): (T & { amountCents: Cents })[] {
+  const parts = taxes.map((t) => ({ ...t, amountCents: pctOf(t.amountCents as Cents, pct) }));
+  const diff = depositTaxCents - parts.reduce((s, t) => s + t.amountCents, 0);
+  if (diff !== 0 && parts.length) {
+    const largest = parts.reduce((a, b) => (b.amountCents > a.amountCents ? b : a));
+    largest.amountCents = (largest.amountCents + diff) as Cents;
+  }
+  return parts;
+}

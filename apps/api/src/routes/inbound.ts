@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.ts";
 import type { makeGuards } from "../http/context.ts";
-import { handleInboundWebhook, listQuarantine, releaseQuarantined } from "../services/intake.ts";
+import { handleDeliveryEvent, handleInboundWebhook, listQuarantine, releaseQuarantined } from "../services/intake.ts";
 
 type Guards = ReturnType<typeof makeGuards>;
 
@@ -14,6 +14,11 @@ export const webhookRoutes = ({ db, pool, boss, store, inbound, cfg }: Deps): Fa
     const outcome = await handleInboundWebhook(
       { db, pool, boss, store, inbound, rateLimitPerHour: cfg.intakeRateLimitPerHour },
       req.body as string, req.headers);
+    return { ok: true, outcome };
+  });
+  // Delivery events for what we sent: bounces and complaints (§12, §21).
+  app.post("/webhooks/resend/events", { bodyLimit: 512 * 1024 }, async (req) => {
+    const outcome = await handleDeliveryEvent({ db, pool, boss, inbound }, req.body as string, req.headers);
     return { ok: true, outcome };
   });
 };

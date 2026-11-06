@@ -49,6 +49,7 @@ async function seed(biz: string, label: string) {
     await c.query(`insert into notifications(business_id, user_id, kind, entity_id, channel) values ($1, $2, 'draft_ready', $3, 'email')`, [biz, user, quote]);
     await c.query(`insert into usage_counters(business_id, month) values ($1, date_trunc('month', current_date))`, [biz]);
     await c.query(`insert into email_events(business_id, document_id, provider_id, type) values ($1, $2, 'p', 'delivered')`, [biz, quote]);
+    await c.query(`insert into email_suppressions(business_id, email, reason) values ($1, 'x@example.com', 'bounce')`, [biz]);
   });
 }
 

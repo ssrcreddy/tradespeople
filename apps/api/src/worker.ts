@@ -8,6 +8,9 @@ import { fetchInbound } from "./jobs/fetchInbound.ts";
 import { extract } from "./jobs/extract.ts";
 import { notify } from "./jobs/notify.ts";
 import { stuckSweep } from "./jobs/stuckSweep.ts";
+import { sendDocument, sendFailed } from "./jobs/sendDocument.ts";
+import { invoiceReminder } from "./jobs/invoiceReminder.ts";
+import { expirySweep } from "./jobs/expirySweep.ts";
 
 export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: object) => void = (m, e) => console.log(JSON.stringify({ msg: m, ...e }))) {
   const wrap = <T extends object>(name: string, fn: (d: WorkerDeps, data: T) => Promise<unknown>) =>
@@ -25,6 +28,10 @@ export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: obj
   await d.boss.work(Q.extract, { batchSize: 1 }, wrap(Q.extract, extract));
   await d.boss.work(Q.notify, { batchSize: 1 }, wrap(Q.notify, notify));
   await d.boss.work(Q.stuckSweep, { batchSize: 1 }, wrap(Q.stuckSweep, (dd) => stuckSweep(dd)));
+  await d.boss.work(Q.sendDocument, { batchSize: 1 }, wrap(Q.sendDocument, sendDocument));
+  await d.boss.work(Q.sendFailed, { batchSize: 1 }, wrap(Q.sendFailed, sendFailed));
+  await d.boss.work(Q.invoiceReminder, { batchSize: 1 }, wrap(Q.invoiceReminder, invoiceReminder));
+  await d.boss.work(Q.expirySweep, { batchSize: 1 }, wrap(Q.expirySweep, (dd) => expirySweep(dd)));
 }
 
 if (process.argv[1]?.endsWith("worker.ts")) {
@@ -38,6 +45,7 @@ if (process.argv[1]?.endsWith("worker.ts")) {
   };
   await startWorkers(deps);
   await rt.boss.schedule(Q.stuckSweep, "*/5 * * * *");
+  await rt.boss.schedule(Q.expirySweep, "0 6 * * *");
   console.log(JSON.stringify({ msg: "worker started", llm: rt.llm.model }));
 
   const shutdown = async () => {

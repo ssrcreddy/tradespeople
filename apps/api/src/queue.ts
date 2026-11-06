@@ -10,6 +10,10 @@ export const Q = {
   extract: "extract",
   notify: "notify",
   stuckSweep: "stuck-sweep",
+  sendFailed: "send-failed",      // dead letter for send-document: created first
+  sendDocument: "send-document",
+  invoiceReminder: "invoice-reminder",
+  expirySweep: "expiry-sweep",
 } as const;
 export type QueueName = (typeof Q)[keyof typeof Q];
 
@@ -18,6 +22,10 @@ const QUEUE_OPTIONS: Record<QueueName, Parameters<PgBoss["createQueue"]>[1]> = {
   [Q.extract]: { retryLimit: 3, retryDelay: 15, retryBackoff: true, expireInSeconds: 300 },
   [Q.notify]: { retryLimit: 3, retryDelay: 30, retryBackoff: true, expireInSeconds: 60 },
   [Q.stuckSweep]: { retryLimit: 0, expireInSeconds: 120 },
+  [Q.sendFailed]: { retryLimit: 3, retryDelay: 30, expireInSeconds: 60 },
+  [Q.sendDocument]: { retryLimit: 3, retryDelay: 30, retryBackoff: true, expireInSeconds: 120, deadLetter: Q.sendFailed },
+  [Q.invoiceReminder]: { retryLimit: 2, retryDelay: 300, expireInSeconds: 120 },
+  [Q.expirySweep]: { retryLimit: 0, expireInSeconds: 120 },
 };
 
 export const SCHEMA = "pgboss";

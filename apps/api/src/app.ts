@@ -14,6 +14,7 @@ import { customerRoutes } from "./routes/customers.ts";
 import { quoteRoutes } from "./routes/quotes.ts";
 import { jobRoutes } from "./routes/jobs.ts";
 import { webhookRoutes, inboxRoutes } from "./routes/inbound.ts";
+import { invoiceRoutes } from "./routes/invoices.ts";
 
 export interface Deps { db: Db; pool: pg.Pool; auth: Auth; cfg: Config; boss: Boss; store: ObjectStore; inbound: InboundProvider }
 
@@ -62,6 +63,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   await app.register(quoteRoutes(deps, guards));
   await app.register(jobRoutes(deps, guards));
   await app.register(inboxRoutes(deps, guards));
+  await app.register(invoiceRoutes(deps, guards));
   await app.register(webhookRoutes(deps));
   return app;
 }

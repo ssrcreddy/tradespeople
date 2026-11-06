@@ -4,7 +4,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { type Db, type Tx, withTenant } from "../db/client.ts";
-import { businesses, customers, inboundMessages, jobs, type JobFile } from "../db/schema.ts";
+import { businesses, customers, emailEvents, emailSuppressions, inboundMessages, jobs, type JobFile } from "../db/schema.ts";
 import { enqueue, Q, type Boss } from "../queue.ts";
 import type { ObjectStore } from "../storage.ts";
 import { type InboundProvider, intakeTokenOf, bareAddress } from "../inbound.ts";
@@ -172,4 +172,35 @@ export async function releaseQuarantined(db: Db, boss: Boss, t: TenantCtx, inbou
     await audit(tx, t.businessId, t.userId, "inbound_message", m.id, "inbound.released", { allowSender });
     return { jobId };
   });
+}
+
+// ---------- delivery events for outbound email ----------
+
+export async function handleDeliveryEvent(
+  d: Pick<WebhookDeps, "db" | "pool" | "boss" | "inbound">, rawBody: string, headers: Record<string, string | string[] | undefined>,
+): Promise<string> {
+  let e;
+  try {
+    e = d.inbound.verifyDelivery(rawBody, headers);
+  } catch {
+    throw new AppError(401, "BAD_SIGNATURE", "invalid webhook signature");
+  }
+  if (!e) return "ignored";
+  const { rows } = await d.pool.query<{ business_id: string; kind: string; document_id: string }>(
+    "select * from app_document_by_provider_email($1)", [e.providerEmailId]);
+  const doc = rows[0];
+  if (!doc) return "unknown";       // e.g. a reminder or owner notification: not tracked on a document
+
+  const { type, recipient, providerEmailId } = e;
+  await withTenant(d.db, doc.business_id, async (tx) => {
+    await tx.insert(emailEvents).values({ businessId: doc.business_id, documentId: doc.document_id, providerId: providerEmailId, type });
+    if ((type === "bounced" || type === "complained") && recipient) {
+      await tx.insert(emailSuppressions)
+        .values({ businessId: doc.business_id, email: bareAddress(recipient), reason: type === "bounced" ? "bounce" : "complaint" })
+        .onConflictDoNothing();
+    }
+    if (type === "bounced") await notifyOwners(d.boss, tx, doc.business_id, "bounced", `${doc.kind}:${doc.document_id}`);
+    await audit(tx, doc.business_id, "system", doc.kind, doc.document_id, `email.${type}`);
+  });
+  return type;
 }

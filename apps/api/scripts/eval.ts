@@ -64,7 +64,7 @@ const llm = args.fake || !cfg.openai
   : openAiProvider(cfg.openai);
 const deps: WorkerDeps = {
   db, pool, boss, store, llm, mailer: memoryMailer(), pricing: cfg.pricing, webOrigin: cfg.webOrigin,
-  llmMonthlyCapUsd: 1_000_000, inbound: { verify: () => null, fetch: async () => { throw new Error("n/a"); } },
+  llmMonthlyCapUsd: 1_000_000, inbound: { verify: () => null, verifyDelivery: () => null, fetch: async () => { throw new Error("n/a"); } },
 };
 
 // Throwaway tenant with the starter pack and sample rates.

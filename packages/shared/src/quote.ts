@@ -48,6 +48,7 @@ export const QuotePatch = z.object({
   lines: z.array(QuoteLineInput).max(200).optional(),
   discountCents: int().optional(),
   terms: z.string().max(4000).optional(),
+  depositPct: int().max(100).optional(),
 });
 export type QuotePatch = z.infer<typeof QuotePatch>;
 

@@ -13,6 +13,7 @@ import type { Config } from "./config.ts";
 
 const unavailableInbound: InboundProvider = {
   verify() { throw new Error("inbound email is not configured (RESEND_API_KEY / RESEND_INBOUND_SECRET)"); },
+  verifyDelivery() { throw new Error("email events are not configured"); },
   async fetch() { throw new Error("inbound email is not configured"); },
 };
 
@@ -28,7 +29,7 @@ export function buildRuntime(cfg: Config, mode: "http" | "worker") {
     cfg, db, pool, boss,
     auth: createAuth(db, cfg),
     store: s3Store(cfg.s3),
-    inbound: cfg.resend?.inboundSecret ? resendInbound(cfg.resend.apiKey, cfg.resend.inboundSecret) : unavailableInbound,
+    inbound: cfg.resend?.inboundSecret ? resendInbound(cfg.resend.apiKey, cfg.resend.inboundSecret, cfg.resend.eventsSecret) : unavailableInbound,
     mailer: cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.sender) : memoryMailer(true),
     llm: cfg.openai
       ? openAiProvider(cfg.openai)

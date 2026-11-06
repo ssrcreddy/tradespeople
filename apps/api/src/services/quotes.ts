@@ -12,10 +12,10 @@ import { businesses, customers, jobs, priceBookItems, quoteLines, quotes } from 
 import { computeTotals, previewTotals, type EngineLine } from "./quoteEngine.ts";
 import { expandItem } from "./priceBook.ts";
 import { audit } from "./audit.ts";
+import { assertQuoteTransition, type QuoteRow } from "./transitions.ts";
 import { AppError, notFound } from "../http/errors.ts";
 import type { TenantCtx } from "../http/context.ts";
 
-type QuoteRow = typeof quotes.$inferSelect;
 type LineRow = typeof quoteLines.$inferSelect;
 
 const DEFAULT_TERMS = "Quote valid for the period shown. Work performed to code; permit and inspection included where listed.";
@@ -43,9 +43,10 @@ const fromRow = (l: LineRow): DraftLine => ({
 });
 
 export function view(q: QuoteRow, lines: LineRow[]) {
-  const { businessId: _b, snapshot: _s, ...rest } = q;
+  const { businessId: _b, snapshot: _s, acceptedSnapshot: _a, pdfObjectKey, pdfSha256: _h, providerEmailId: _p, usageCounted: _u, ...rest } = q;
   return {
     ...rest,
+    hasPdf: pdfObjectKey !== null,
     lines: lines.map((l) => ({
       id: l.id, description: l.description, qty: formatQtyMilli(l.qtyMilli as QtyMilli), unit: l.unit,
       unitPriceCents: l.unitPriceCents, lineTotalCents: l.lineTotalCents, priceBookItemId: l.priceBookItemId,
@@ -56,16 +57,16 @@ export function view(q: QuoteRow, lines: LineRow[]) {
 }
 export type QuoteView = ReturnType<typeof view>;
 
-async function loadLines(tx: Tx, businessId: string, quoteId: string) {
+export async function loadLines(tx: Tx, businessId: string, quoteId: string) {
   return tx.select().from(quoteLines)
     .where(and(eq(quoteLines.businessId, businessId), eq(quoteLines.quoteId, quoteId)))
     .orderBy(asc(quoteLines.sort));
 }
 
 // Explicit tenant filter on every query (§11) — RLS is the second layer, not the only one.
-const quoteOf = (businessId: string, id: string) => and(eq(quotes.businessId, businessId), eq(quotes.id, id));
+export const quoteOf = (businessId: string, id: string) => and(eq(quotes.businessId, businessId), eq(quotes.id, id));
 
-async function taxesOf(tx: Tx, businessId: string) {
+export async function taxesOf(tx: Tx, businessId: string) {
   const [b] = await tx.select({ taxComponents: businesses.taxComponents }).from(businesses).where(eq(businesses.id, businessId));
   return b!.taxComponents;
 }
@@ -127,7 +128,7 @@ export async function getQuote(db: Db, t: TenantCtx, id: string) {
 // lines/discount/terms, recompute with the engine, store, audit.
 async function editQuote(
   db: Db, t: TenantCtx, id: string, lockVersion: number, action: string,
-  mutate: (tx: Tx, q: QuoteRow, current: LineRow[]) => Promise<{ lines: DraftLine[]; discountCents: number; terms: string }>,
+  mutate: (tx: Tx, q: QuoteRow, current: LineRow[]) => Promise<NextDraft>,
 ) {
   return withTenant(db, t.businessId, async (tx) => {
     const [q] = await tx.select().from(quotes).where(quoteOf(t.businessId, id)).for("update");
@@ -147,10 +148,12 @@ async function editQuote(
   });
 }
 
+interface NextDraft { lines: DraftLine[]; discountCents: number; terms: string; depositPct?: number | undefined }
+
 // Recompute with the engine, replace the lines, store totals, audit.
-async function applyLines(
+export async function applyLines(
   tx: Tx, businessId: string, actor: string, q: QuoteRow, current: (LineRow | DraftLine)[],
-  next: { lines: DraftLine[]; discountCents: number; terms: string }, action: string,
+  next: NextDraft, action: string,
 ): Promise<QuoteRow> {
   const id = q.id;
   const t = { businessId, userId: actor };
@@ -179,6 +182,7 @@ async function applyLines(
   }
 
   const demoted = q.status === "approved";
+  if (demoted) assertQuoteTransition("approved", "draft");
   const [updated] = await tx.update(quotes).set({
     requestedDiscountCents: next.discountCents,
     discountCents: strict?.discountCents ?? 0,
@@ -189,10 +193,15 @@ async function applyLines(
     taxes: strict?.taxes ?? [],
     totalsComplete: strict !== null,
     terms: next.terms,
+    ...(next.depositPct !== undefined ? { depositPct: next.depositPct } : {}),
     lockVersion: q.lockVersion + 1,
     updatedAt: new Date(),
-    // Editing an approved quote returns it to draft and discards the snapshot (§19).
-    ...(demoted ? { status: "draft" as const, snapshot: null, approvedBy: null, approvedAt: null } : {}),
+    // Editing an approved quote returns it to draft and discards the snapshot
+    // and any PDF rendered from it (§19).
+    ...(demoted ? {
+      status: "draft" as const, snapshot: null, approvedBy: null, approvedAt: null,
+      pdfObjectKey: null, pdfSha256: null, providerEmailId: null, lastSendError: null,
+    } : {}),
   }).where(quoteOf(t.businessId, id)).returning();
 
   if (demoted) await audit(tx, t.businessId, t.userId, "quote", id, "quote.demoted");
@@ -239,6 +248,7 @@ export async function patchQuote(db: Db, t: TenantCtx, id: string, patch: QuoteP
     lines: patch.lines ? await toDraftLines(tx, t.businessId, patch.lines, current) : current.map(fromRow),
     discountCents: patch.discountCents ?? q.requestedDiscountCents,
     terms: patch.terms ?? q.terms,
+    depositPct: patch.depositPct,
   }));
 }
 

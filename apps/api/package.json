@@ -17,12 +17,14 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
     "@fastify/multipart": "^10.1.6",
+    "@fontsource/noto-sans": "^5.3.0",
     "@qa/shared": "workspace:*",
     "better-auth": "^1.7.15",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
     "heic-convert": "^2.1.0",
     "openai": "^6.49.0",
+    "pdfkit": "^0.17.2",
     "pg": "^8.23.1",
     "pg-boss": "^12.38.0",
     "resend": "^6.37.0",
@@ -30,6 +32,7 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
     "fast-check": "^4.10.2",

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import multipart from "@fastify/multipart";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { Deps } from "../app.ts";
 import type { makeGuards } from "../http/context.ts";
@@ -55,7 +55,7 @@ export const jobRoutes = ({ db, boss, store }: Deps, g: Guards): FastifyPluginAs
       customerName: customers.name, quoteId: quotes.id,
     }).from(jobs)
       .leftJoin(customers, eq(customers.id, jobs.customerId))
-      .leftJoin(quotes, eq(quotes.jobId, jobs.id))
+      .leftJoin(quotes, and(eq(quotes.jobId, jobs.id), ne(quotes.status, "superseded")))
       .where(eq(jobs.businessId, t.businessId))
       .orderBy(desc(jobs.createdAt)).limit(200));
   });
@@ -67,7 +67,8 @@ export const jobRoutes = ({ db, boss, store }: Deps, g: Guards): FastifyPluginAs
     return withTenant(db, t.businessId, async (tx) => {
       const [j] = await tx.select().from(jobs).where(and(eq(jobs.businessId, t.businessId), eq(jobs.id, id)));
       if (!j) throw notFound("job");
-      const [q] = await tx.select({ id: quotes.id }).from(quotes).where(and(eq(quotes.businessId, t.businessId), eq(quotes.jobId, id)));
+      const [q] = await tx.select({ id: quotes.id }).from(quotes)
+        .where(and(eq(quotes.businessId, t.businessId), eq(quotes.jobId, id), ne(quotes.status, "superseded")));
       const ex = j.extraction as { questions?: string[]; summary?: string; urgency?: string } | null;
       return {
         id: j.id, source: j.source, status: j.status, subject: j.subject, createdAt: j.createdAt,

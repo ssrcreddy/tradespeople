@@ -19,6 +19,7 @@ const Env = z.object({
 
   RESEND_API_KEY: optional,
   RESEND_INBOUND_SECRET: optional,
+  RESEND_EVENTS_SECRET: optional,
   SENDER_ADDRESS: optional,
 
   OPENAI_API_KEY: optional,
@@ -41,7 +42,7 @@ export type Config = {
   port: number;
   production: boolean;
   s3: { endpoint: string | undefined; bucket: string; accessKeyId: string; secretAccessKey: string };
-  resend: { apiKey: string; inboundSecret: string | undefined; sender: string } | undefined;
+  resend: { apiKey: string; inboundSecret: string | undefined; eventsSecret: string | undefined; sender: string } | undefined;
   openai: { apiKey: string; model: string; temperature: number | undefined } | undefined;
   pricing: { inputUsdPerMTok: number; outputUsdPerMTok: number };
   llmMonthlyCapUsd: number;
@@ -62,7 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     production: e.NODE_ENV === "production",
     s3: { endpoint: e.S3_ENDPOINT, bucket: e.S3_BUCKET, accessKeyId: e.S3_ACCESS_KEY_ID, secretAccessKey: e.S3_SECRET_ACCESS_KEY },
     resend: e.RESEND_API_KEY
-      ? { apiKey: e.RESEND_API_KEY, inboundSecret: e.RESEND_INBOUND_SECRET, sender: e.SENDER_ADDRESS ?? "quotes@localhost" }
+      ? { apiKey: e.RESEND_API_KEY, inboundSecret: e.RESEND_INBOUND_SECRET, eventsSecret: e.RESEND_EVENTS_SECRET, sender: e.SENDER_ADDRESS ?? "quotes@localhost" }
       : undefined,
     openai: e.OPENAI_API_KEY && e.STRONG_MODEL
       ? { apiKey: e.OPENAI_API_KEY, model: e.STRONG_MODEL, temperature: e.LLM_TEMPERATURE }

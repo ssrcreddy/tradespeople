@@ -15,6 +15,9 @@ import { fetchInbound } from "../../src/jobs/fetchInbound.ts";
 import { extract } from "../../src/jobs/extract.ts";
 import { notify } from "../../src/jobs/notify.ts";
 import { stuckSweep } from "../../src/jobs/stuckSweep.ts";
+import { sendDocument, sendFailed } from "../../src/jobs/sendDocument.ts";
+import { invoiceReminder } from "../../src/jobs/invoiceReminder.ts";
+import { expirySweep } from "../../src/jobs/expirySweep.ts";
 
 export const ORIGIN = "http://localhost:3000";
 
@@ -58,6 +61,7 @@ export async function buildTestApp() {
   };
   const handlers: Record<QueueName, (d: WorkerDeps, data: any) => Promise<unknown>> = {
     [Q.fetchInbound]: fetchInbound, [Q.extract]: extract, [Q.notify]: notify, [Q.stuckSweep]: (d) => stuckSweep(d),
+    [Q.sendDocument]: sendDocument, [Q.sendFailed]: sendFailed, [Q.invoiceReminder]: invoiceReminder, [Q.expirySweep]: (d) => expirySweep(d),
   };
 
   // Runs every queued job of the given queues (in order) until none are left —
