@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How It Works</title>
+<style>
+  :root {
+    --bg: #ffffff; --text: #2c2c2a; --muted: #5f5e5a; --line: #888780;
+    --person-fill: #e1f5ee; --person-stroke: #0f6e56; --person-title: #085041; --person-sub: #0f6e56;
+    --app-fill: #eeedfe; --app-stroke: #534ab7; --app-title: #3c3489; --app-sub: #534ab7;
+    --ext-fill: #f1efe8; --ext-stroke: #5f5e5a; --ext-title: #444441; --ext-sub: #5f5e5a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f1f1d; --text: #e8e6dc; --muted: #b4b2a9; --line: #b4b2a9;
+      --person-fill: #085041; --person-stroke: #5dcaa5; --person-title: #e1f5ee; --person-sub: #9fe1cb;
+      --app-fill: #3c3489; --app-stroke: #afa9ec; --app-title: #eeedfe; --app-sub: #cecbf6;
+      --ext-fill: #444441; --ext-stroke: #b4b2a9; --ext-title: #f1efe8; --ext-sub: #d3d1c7;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 56px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 36px 0 8px; }
+  p, li { color: var(--text); }
+  .lead { color: var(--muted); margin: 0 0 8px; }
+  ol, ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  svg { display: block; width: 100%; height: auto; margin: 16px 0; }
+  svg text { font-family: inherit; }
+  .th { font-size: 14px; font-weight: 600; }
+  .ts { font-size: 12px; fill: var(--muted); }
+  .person rect { fill: var(--person-fill); stroke: var(--person-stroke); }
+  .person .th { fill: var(--person-title); } .person .ts { fill: var(--person-sub); }
+  .app rect { fill: var(--app-fill); stroke: var(--app-stroke); }
+  .app .th { fill: var(--app-title); } .app .ts { fill: var(--app-sub); }
+  .ext rect { fill: var(--ext-fill); stroke: var(--ext-stroke); }
+  .ext .th { fill: var(--ext-title); } .ext .ts { fill: var(--ext-sub); }
+  .arr { stroke: var(--line); stroke-width: 1.5; fill: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 14px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
+  .legend .l-person::before { background: var(--person-fill); border-color: var(--person-stroke); }
+  .legend .l-app::before { background: var(--app-fill); border-color: var(--app-stroke); }
+  .legend .l-ext::before { background: var(--ext-fill); border-color: var(--ext-stroke); }
+</style>
+</head>
+<body>
+<main>
+  <h1>How it works</h1>
+  <p class="lead">Tradespeople Quotes &amp; Invoices Agent: the AI drafts quotes from messy customer messages, the app does the pricing, and a person approves everything that gets sent.</p>
+
+  <h2>Who is involved</h2>
+  <p>There are four kinds of actor. The owner is the only one who decides anything, the AI only prepares drafts, and customers never log in.</p>
+  <svg viewBox="0 0 680 260" role="img" aria-labelledby="a-t a-d">
+    <title id="a-t">Actors in the quotes app</title>
+    <desc id="a-d">The customer reaches the app through the email provider, or by a text or call that the owner pastes in. The owner works in the app, and the app calls the AI model.</desc>
+    <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+    <g class="person"><rect x="40" y="40" width="130" height="56" rx="8"/><text class="th" x="105" y="59" text-anchor="middle" dominant-baseline="central">Customer</text><text class="ts" x="105" y="78" text-anchor="middle" dominant-baseline="central">Emails only</text></g>
+    <g class="ext"><rect x="200" y="40" width="130" height="56" rx="8"/><text class="th" x="265" y="59" text-anchor="middle" dominant-baseline="central">Email provider</text><text class="ts" x="265" y="78" text-anchor="middle" dominant-baseline="central">Resend</text></g>
+    <g class="app"><rect x="360" y="40" width="130" height="56" rx="8"/><text class="th" x="425" y="59" text-anchor="middle" dominant-baseline="central">Quotes app</text><text class="ts" x="425" y="78" text-anchor="middle" dominant-baseline="central">Prices, PDFs, reminders</text></g>
+    <g class="ext"><rect x="520" y="40" width="120" height="56" rx="8"/><text class="th" x="580" y="59" text-anchor="middle" dominant-baseline="central">AI model</text><text class="ts" x="580" y="78" text-anchor="middle" dominant-baseline="central">Drafts, never prices</text></g>
+    <g class="person"><rect x="335" y="170" width="180" height="56" rx="8"/><text class="th" x="425" y="189" text-anchor="middle" dominant-baseline="central">Owner or team member</text><text class="ts" x="425" y="208" text-anchor="middle" dominant-baseline="central">Approves everything sent</text></g>
+    <line x1="172" y1="68" x2="198" y2="68" class="arr" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <line x1="332" y1="68" x2="358" y2="68" class="arr" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <line x1="492" y1="68" x2="518" y2="68" class="arr" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <line x1="425" y1="168" x2="425" y2="98" class="arr" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <path d="M105 98 L105 198 L333 198" class="arr" marker-end="url(#arrow)"/>
+    <text class="ts" x="117" y="186">Text or call, pasted in</text>
+  </svg>
+  <ul>
+    <li><strong>Owner:</strong> can do everything, and is the only one who can change business settings, change the intake email address, export the data or delete the business.</li>
+    <li><strong>Team member:</strong> the role exists in the code, but the app has no way to invite anyone yet, so today it's a single-owner app.</li>
+    <li><strong>Customer:</strong> sends enquiries and receives quotes and invoices by email. They never use the app.</li>
+    <li><strong>AI model:</strong> reads messages and suggests lines and questions. It never sets a price and never sends anything.</li>
+  </ul>
+
+  <h2>One job, start to finish</h2>
+  <div class="legend"><span class="l-person">Done by a person</span><span class="l-app">App and AI, automatic</span></div>
+  <svg viewBox="0 0 680 240" role="img" aria-labelledby="f-t f-d">
+    <title id="f-t">One job from enquiry to payment</title>
+    <desc id="f-d">Enquiry, AI draft, owner review, owner send, customer reply, owner records outcome, owner creates invoice, owner records payment.</desc>
+    <g class="person"><rect x="40" y="40" width="130" height="56" rx="8"/><text class="th" x="105" y="59" text-anchor="middle" dominant-baseline="central">Enquiry</text><text class="ts" x="105" y="78" text-anchor="middle" dominant-baseline="central">Customer writes</text></g>
+    <g class="app"><rect x="197" y="40" width="130" height="56" rx="8"/><text class="th" x="262" y="59" text-anchor="middle" dominant-baseline="central">Draft</text><text class="ts" x="262" y="78" text-anchor="middle" dominant-baseline="central">AI reads, app prices</text></g>
+    <g class="person"><rect x="354" y="40" width="130" height="56" rx="8"/><text class="th" x="419" y="59" text-anchor="middle" dominant-baseline="central">Review</text><text class="ts" x="419" y="78" text-anchor="middle" dominant-baseline="central">Owner fixes lines</text></g>
+    <g class="person"><rect x="510" y="40" width="130" height="56" rx="8"/><text class="th" x="575" y="59" text-anchor="middle" dominant-baseline="central">Send quote</text><text class="ts" x="575" y="78" text-anchor="middle" dominant-baseline="central">Owner approves</text></g>
+    <g class="person"><rect x="40" y="150" width="130" height="56" rx="8"/><text class="th" x="105" y="169" text-anchor="middle" dominant-baseline="central">Reply</text><text class="ts" x="105" y="188" text-anchor="middle" dominant-baseline="central">Customer decides</text></g>
+    <g class="person"><rect x="197" y="150" width="130" height="56" rx="8"/><text class="th" x="262" y="169" text-anchor="middle" dominant-baseline="central">Record outcome</text><text class="ts" x="262" y="188" text-anchor="middle" dominant-baseline="central">Owner marks it</text></g>
+    <g class="person"><rect x="354" y="150" width="130" height="56" rx="8"/><text class="th" x="419" y="169" text-anchor="middle" dominant-baseline="central">Invoice</text><text class="ts" x="419" y="188" text-anchor="middle" dominant-baseline="central">Owner creates</text></g>
+    <g class="person"><rect x="510" y="150" width="130" height="56" rx="8"/><text class="th" x="575" y="169" text-anchor="middle" dominant-baseline="central">Payment</text><text class="ts" x="575" y="188" text-anchor="middle" dominant-baseline="central">Owner records</text></g>
+    <line x1="172" y1="68" x2="195" y2="68" class="arr" marker-end="url(#arrow)"/>
+    <line x1="329" y1="68" x2="352" y2="68" class="arr" marker-end="url(#arrow)"/>
+    <line x1="486" y1="68" x2="508" y2="68" class="arr" marker-end="url(#arrow)"/>
+    <path d="M575 98 L575 123 L105 123 L105 148" class="arr" marker-end="url(#arrow)"/>
+    <line x1="172" y1="178" x2="195" y2="178" class="arr" marker-end="url(#arrow)"/>
+    <line x1="329" y1="178" x2="352" y2="178" class="arr" marker-end="url(#arrow)"/>
+    <line x1="486" y1="178" x2="508" y2="178" class="arr" marker-end="url(#arrow)"/>
+  </svg>
+
+  <h2>How to use it, as the owner</h2>
+  <ol>
+    <li><strong>Set up once:</strong> sign up, then enter your business and tax details and your rates. Your rates are what every quote is priced from.</li>
+    <li><strong>Add an enquiry:</strong> paste the message into a new job. Once email is set up, forwarded enquiries arrive by themselves.</li>
+    <li><strong>Review the draft:</strong> the AI splits the message into lines and the app prices them from your price book. Fix anything amber or unpriced, and answer or ignore the AI's questions.</li>
+    <li><strong>Approve and send:</strong> nothing goes to a customer until you do this.</li>
+    <li><strong>Record the customer's answer:</strong> customers reply by email or phone, so you mark the quote accepted or declined yourself. There's no customer login or online accept button.</li>
+    <li><strong>Invoice and record payment:</strong> an invoice can only be made from an accepted quote. You record payments yourself, because the app doesn't take card payments. The app sends reminders for you, once real email is set up.</li>
+  </ol>
+</main>
+</body>
+</html>
