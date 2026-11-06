@@ -29,6 +29,7 @@ const Env = z.object({
   LLM_OUTPUT_USD_PER_MTOK: z.coerce.number().nonnegative().default(10),
   LLM_MONTHLY_CAP_USD: z.coerce.number().positive().default(20),
   FAKE_LLM_FILE: optional,
+  SENTRY_DSN: optional,
 });
 
 export type Config = {
@@ -47,6 +48,7 @@ export type Config = {
   pricing: { inputUsdPerMTok: number; outputUsdPerMTok: number };
   llmMonthlyCapUsd: number;
   fakeLlmFile: string | undefined;
+  sentryDsn: string | undefined;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -71,5 +73,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     pricing: { inputUsdPerMTok: e.LLM_INPUT_USD_PER_MTOK, outputUsdPerMTok: e.LLM_OUTPUT_USD_PER_MTOK },
     llmMonthlyCapUsd: e.LLM_MONTHLY_CAP_USD,
     fakeLlmFile: e.FAKE_LLM_FILE,
+    sentryDsn: e.SENTRY_DSN,
   };
 }

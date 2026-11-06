@@ -1,6 +1,7 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { EngineError } from "../services/quoteEngine.ts";
+import { captureError } from "../observability.ts";
 
 // Errors as { error: { code, message } } with stable codes (design §21).
 export class AppError extends Error {
@@ -41,6 +42,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       return reply.code(400).send({ error: { code: "BAD_REQUEST", message: err.message } });
     }
     req.log.error({ err }, "unhandled error");
+    captureError(err, { businessId: req.tenant?.businessId, route: req.routeOptions?.url });
     return reply.code(500).send({ error: { code: "INTERNAL", message: "internal error" } });
   });
 }

@@ -51,9 +51,19 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
     },
   });
 
-  app.get("/health", async () => {
-    await deps.pool.query("select 1");
-    return { ok: true };
+  // Polled by an external uptime check (§23). 503 when the queue is backing up,
+  // so a dead worker is visible before a pilot notices missing drafts.
+  app.get("/health", async (_req, reply) => {
+    const { rows } = await deps.pool.query<{ queued: number; oldest_seconds: number | null; last_webhook: string | null }>(`
+      select count(*)::int as queued,
+             extract(epoch from now() - min(created_on))::int as oldest_seconds,
+             app_last_inbound_at() as last_webhook
+      from pgboss.job where state in ('created', 'retry') and start_after <= now()`);
+    const q = rows[0]!;
+    const ok = (q.oldest_seconds ?? 0) < 600;
+    return reply.code(ok ? 200 : 503).send({
+      ok, queueDepth: q.queued, oldestQueuedSeconds: q.oldest_seconds ?? 0, lastWebhookAt: q.last_webhook,
+    });
   });
 
   const guards = makeGuards(deps.auth, deps.pool);

@@ -2,8 +2,10 @@
 import { loadConfig } from "./config.ts";
 import { buildRuntime } from "./runtime.ts";
 import { buildApp } from "./app.ts";
+import { initSentry } from "./observability.ts";
 
 const cfg = loadConfig();
+await initSentry(cfg.sentryDsn, "api");
 const rt = buildRuntime(cfg, "http");
 rt.boss.on("error", (e) => console.error(JSON.stringify({ msg: "pg-boss error", error: e.message })));
 await rt.boss.start();

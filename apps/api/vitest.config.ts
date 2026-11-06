@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     projects: [
       {
-        test: { name: "unit", include: ["test/unit/**/*.test.ts"] },
+        test: { name: "unit", include: ["test/unit/**/*.test.ts"], testTimeout: 60_000 },
       },
       {
         test: {

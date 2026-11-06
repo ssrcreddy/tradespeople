@@ -39,7 +39,7 @@ export const QuoteLineInput = z.object({
   unitPriceCents: int().nullable(),           // null = needs price
   priceBookItemId: z.uuid().nullable().default(null),
   optional: z.boolean().default(false),
-  groupKey: z.string().max(64).nullable().default(null),
+  groupKey: z.string().max(220).nullable().default(null),
 });
 export type QuoteLineInput = z.infer<typeof QuoteLineInput>;
 
@@ -49,6 +49,7 @@ export const QuotePatch = z.object({
   discountCents: int().optional(),
   terms: z.string().max(4000).optional(),
   depositPct: int().max(100).optional(),
+  customerId: z.uuid().nullable().optional(),
 });
 export type QuotePatch = z.infer<typeof QuotePatch>;
 

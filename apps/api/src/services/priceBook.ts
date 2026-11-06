@@ -158,7 +158,8 @@ export async function expandItem(tx: Tx, businessId: string, itemId: string, qty
     .innerJoin(priceBookItems, eq(priceBookItems.id, assemblyComponents.componentId))
     .where(and(eq(assemblyComponents.businessId, businessId), eq(assemblyComponents.assemblyId, item.id)))
     .orderBy(asc(assemblyComponents.sort));
-  const groupKey = `${item.id.slice(0, 8)}:${item.name}`.slice(0, 64);
+  // The name after the colon prints on customer documents: never truncated.
+  const groupKey = `${item.id.slice(0, 8)}:${item.name}`;
   return comps.map((c) => ({
     description: c.name,
     // line qty × component qty, both in thousandths

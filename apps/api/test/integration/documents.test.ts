@@ -184,7 +184,19 @@ describe("sending", () => {
     expect(sha(stored.body)).toBe(rows[0].pdf_sha256);
     const dl = await t.app.inject({ method: "GET", url: `/quotes/${q.id}/pdf`, headers: { cookie: A.cookie } });
     expect(sha(dl.rawPayload)).toBe(rows[0].pdf_sha256);
-    expect(dl.headers["content-disposition"]).toMatch(/^attachment/);
+    expect(dl.headers["content-disposition"]).toMatch(/^attachment; filename="Quote-Q-\d{4}-v1\.pdf"/);
+  });
+
+  it("keeps a long assembly name whole, because it prints on the document", async () => {
+    const part = (await A.req("POST", "/price-book", { kind: "material", name: "Part", unit: "each", rateCents: 100 })).body;
+    const name = "EV charger install — 48 A Level 2 (charger supplied by customer, up to 30 ft from the panel)";
+    const asm = (await A.req("POST", "/price-book", { kind: "assembly", name, unit: "each", components: [{ componentId: part.id, qty: "1" }] })).body;
+    let q = (await A.req("POST", "/quotes", { customerId })).body;
+    q = (await A.req("POST", `/quotes/${q.id}/lines/from-price-book`, { lockVersion: 0, priceBookItemId: asm.id })).body;
+    expect(q.lines[0].groupKey.split(":").slice(1).join(":")).toBe(name);
+    // A saved edit round-trips the key through the API's validation.
+    const lines = q.lines.map((l: any) => ({ id: l.id, description: l.description, qty: l.qty, unit: l.unit, unitPriceCents: l.unitPriceCents, groupKey: l.groupKey }));
+    expect((await A.req("PATCH", `/quotes/${q.id}`, { lockVersion: q.lockVersion, lines })).status).toBe(200);
   });
 
   it("refuses edits while a quote is sending", async () => {

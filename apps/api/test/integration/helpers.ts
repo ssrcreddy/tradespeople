@@ -41,6 +41,7 @@ export async function buildTestApp() {
     pricing: { inputUsdPerMTok: 2.5, outputUsdPerMTok: 10 },
     llmMonthlyCapUsd: 20,
     fakeLlmFile: undefined,
+    sentryDsn: undefined,
   };
   const { db, pool } = createDb(cfg.databaseUrl);
   // Superuser connection for test setup and inspection only (bypasses RLS).

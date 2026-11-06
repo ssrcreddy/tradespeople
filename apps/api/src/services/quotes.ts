@@ -148,7 +148,7 @@ async function editQuote(
   });
 }
 
-interface NextDraft { lines: DraftLine[]; discountCents: number; terms: string; depositPct?: number | undefined }
+interface NextDraft { lines: DraftLine[]; discountCents: number; terms: string; depositPct?: number | undefined; customerId?: string | null | undefined }
 
 // Recompute with the engine, replace the lines, store totals, audit.
 export async function applyLines(
@@ -194,6 +194,7 @@ export async function applyLines(
     totalsComplete: strict !== null,
     terms: next.terms,
     ...(next.depositPct !== undefined ? { depositPct: next.depositPct } : {}),
+    ...(next.customerId !== undefined ? { customerId: next.customerId } : {}),
     lockVersion: q.lockVersion + 1,
     updatedAt: new Date(),
     // Editing an approved quote returns it to draft and discards the snapshot
@@ -244,12 +245,20 @@ async function toDraftLines(tx: Tx, businessId: string, input: QuoteLineInput[],
 }
 
 export async function patchQuote(db: Db, t: TenantCtx, id: string, patch: QuotePatch) {
-  return editQuote(db, t, id, patch.lockVersion, "quote.edited", async (tx, q, current) => ({
-    lines: patch.lines ? await toDraftLines(tx, t.businessId, patch.lines, current) : current.map(fromRow),
-    discountCents: patch.discountCents ?? q.requestedDiscountCents,
-    terms: patch.terms ?? q.terms,
-    depositPct: patch.depositPct,
-  }));
+  return editQuote(db, t, id, patch.lockVersion, "quote.edited", async (tx, q, current) => {
+    if (patch.customerId) {
+      const [c] = await tx.select({ id: customers.id }).from(customers)
+        .where(and(eq(customers.businessId, t.businessId), eq(customers.id, patch.customerId)));
+      if (!c) throw notFound("customer");
+    }
+    return {
+      lines: patch.lines ? await toDraftLines(tx, t.businessId, patch.lines, current) : current.map(fromRow),
+      discountCents: patch.discountCents ?? q.requestedDiscountCents,
+      terms: patch.terms ?? q.terms,
+      depositPct: patch.depositPct,
+      customerId: patch.customerId,
+    };
+  });
 }
 
 export async function addFromPriceBook(db: Db, t: TenantCtx, id: string, input: z.infer<typeof AddFromPriceBook>) {

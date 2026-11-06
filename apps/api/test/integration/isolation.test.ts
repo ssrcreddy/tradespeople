@@ -95,6 +95,9 @@ describe("A cannot reference B's rows from its own", () => {
     const r = await A.req("PATCH", `/quotes/${aQuote.id}`, { lockVersion: 0, lines: [{ id: b.quote.lines[0].id, description: "x", qty: "1", unit: "each", unitPriceCents: 1 }] });
     expect(r.body.error.code).toBe("UNKNOWN_LINE");
   });
+  it("cannot point its quote at B's customer", async () => {
+    expect((await A.req("PATCH", `/quotes/${aQuote.id}`, { lockVersion: 0, customerId: b.customer.id })).status).toBe(404);
+  });
   it("cannot build an assembly from B's items", async () => {
     const r = await A.req("POST", "/price-book", { kind: "assembly", name: "steal", unit: "each", components: [{ componentId: b.item.id, qty: "1" }] });
     expect(r.body.error.code).toBe("UNKNOWN_COMPONENT");

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { QuotePatch, AddFromPriceBook, PreviewRequest } from "@qa/shared";
+import { QuotePatch, AddFromPriceBook, PreviewRequest, type QuoteSnapshot } from "@qa/shared";
 import type { Deps } from "../app.ts";
 import type { makeGuards } from "../http/context.ts";
 import { createQuote, listQuotes, getQuote, patchQuote, addFromPriceBook, preview, quoteOf } from "../services/quotes.ts";
@@ -50,10 +50,11 @@ export const quoteRoutes = ({ db, boss, store }: Deps, g: Guards): FastifyPlugin
     const { id } = IdParam.parse(req.params);
     const t = req.tenant!;
     const [q] = await withTenant(db, t.businessId, (tx) =>
-      tx.select({ key: quotes.pdfObjectKey, number: quotes.number, version: quotes.version }).from(quotes).where(quoteOf(t.businessId, id)));
+      tx.select({ key: quotes.pdfObjectKey, snapshot: quotes.snapshot }).from(quotes).where(quoteOf(t.businessId, id)));
     if (!q?.key) throw notFound("PDF");
     const o = await store.get(q.key);
+    const s = q.snapshot as QuoteSnapshot;
     return reply.type("application/pdf")
-      .header("content-disposition", `attachment; filename="Quote-${q.number}-v${q.version}.pdf"`).send(o.body);
+      .header("content-disposition", `attachment; filename="Quote-${s.number}-v${s.version}.pdf"`).send(o.body);
   });
 };

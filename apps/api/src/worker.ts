@@ -3,6 +3,7 @@
 import { loadConfig } from "./config.ts";
 import { buildRuntime } from "./runtime.ts";
 import { Q } from "./queue.ts";
+import { captureError, initSentry } from "./observability.ts";
 import type { WorkerDeps } from "./jobs/deps.ts";
 import { fetchInbound } from "./jobs/fetchInbound.ts";
 import { extract } from "./jobs/extract.ts";
@@ -21,6 +22,7 @@ export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: obj
         log("job.done", { queue: name, jobId: job!.id, ms: Date.now() - started, result: r });
       } catch (err) {
         log("job.failed", { queue: name, jobId: job!.id, error: (err as Error).message });
+        captureError(err, { queue: name, jobId: job!.id });
         throw err;   // pg-boss retries with backoff
       }
     };
@@ -36,6 +38,7 @@ export async function startWorkers(d: WorkerDeps, log: (msg: string, extra?: obj
 
 if (process.argv[1]?.endsWith("worker.ts")) {
   const cfg = loadConfig();
+  await initSentry(cfg.sentryDsn, "worker");
   const rt = buildRuntime(cfg, "worker");
   rt.boss.on("error", (e) => console.error(JSON.stringify({ msg: "pg-boss error", error: e.message })));
   await rt.boss.start();

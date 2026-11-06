@@ -9,6 +9,8 @@ import { api, ApiError, dollarsOf, money, parseDollars } from "@/lib/api";
 import { highlight } from "@/lib/highlight";
 import { ErrorNote, Shell, btn, btnGhost, btnPrimary, input, useAuthRedirect } from "@/components/Shell";
 import { Original, type Job } from "@/components/JobBits";
+import { QuoteActions, type QuoteForActions } from "@/components/QuoteActions";
+import { CustomerPicker } from "@/components/CustomerPicker";
 
 type Unit = "each" | "hour" | "flat" | "metre" | "foot";
 interface Line {
@@ -17,9 +19,9 @@ interface Line {
   qtyToConfirm: boolean; suggestions: { id: string; name: string; score: number }[] | null;
   sourceQuote: string | null; sourceKind: string; originalQty: string;
 }
-interface Quote {
-  id: string; number: number; version: number; status: string; jobId: string | null; customerId: string | null;
-  lockVersion: number; requestedDiscountCents: number; terms: string; lines: any[];
+interface Quote extends QuoteForActions {
+  number: number; jobId: string | null; customerId: string | null;
+  requestedDiscountCents: number; terms: string; lines: any[];
 }
 interface Totals {
   complete: boolean; unpricedLines: number; discountExceedsSubtotal: boolean; lineTotalsCents: (number | null)[];
@@ -43,6 +45,8 @@ export default function Review() {
   const [job, setJob] = useState<Job | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState("");
+  const [deposit, setDeposit] = useState("0");
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [book, setBook] = useState<BookItem[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -57,6 +61,8 @@ export default function Review() {
       setQuote(q);
       setLines(q.lines.map(toLine));
       setDiscount(q.requestedDiscountCents ? dollarsOf(q.requestedDiscountCents) : "");
+      setDeposit(String(q.depositPct));
+      setCustomerId(q.customerId);
       setDirty(false);
       if (q.jobId) setJob(await api<Job>(`/jobs/${q.jobId}`));
     } catch (e) { if (!onAuth(e)) setError((e as Error).message); }
@@ -68,7 +74,10 @@ export default function Review() {
     qty: !QTY.test(l.qty) || Number(l.qty) <= 0, price: parseDollars(l.price) === "invalid", desc: !l.description.trim(),
   })), [lines]);
   const discountCents = parseDollars(discount);
-  const anyInvalid = invalid.some((v) => v.qty || v.price || v.desc) || discountCents === "invalid";
+  const depositValid = /^\d{1,3}$/.test(deposit) && Number(deposit) <= 100;
+  const anyInvalid = invalid.some((v) => v.qty || v.price || v.desc) || discountCents === "invalid" || !depositValid;
+  // Only drafts and approved quotes can change; everything after that is a record.
+  const locked = !!quote && quote.status !== "draft" && quote.status !== "approved";
 
   const payloadLines = useCallback(() => lines.map((l) => ({
     ...(l.id ? { id: l.id } : {}), description: l.description.trim(), qty: l.qty, unit: l.unit,
@@ -99,7 +108,10 @@ export default function Review() {
     if (!quote) return;
     setSaving(true); setError(null);
     try {
-      const q = await api<Quote>(`/quotes/${id}`, { method: "PATCH", json: { lockVersion: quote.lockVersion, lines: payloadLines(), discountCents: discountCents ?? 0 } });
+      const q = await api<Quote>(`/quotes/${id}`, {
+        method: "PATCH",
+        json: { lockVersion: quote.lockVersion, lines: payloadLines(), discountCents: discountCents ?? 0, depositPct: Number(deposit), customerId },
+      });
       setQuote(q); setLines(q.lines.map(toLine)); setDirty(false);
     } catch (e) {
       if (e instanceof ApiError && e.code === "STALE_QUOTE") setError("This quote changed in another tab. Reload to see the latest version — your edits here are not saved.");
@@ -109,15 +121,6 @@ export default function Review() {
 
   const sentences = useMemo(() => (job ? highlight(job.originalText, lines.map((l) => ({ key: l.key, quote: l.sourceKind === "text" || l.sourceKind === "assembly" ? l.sourceQuote : null }))) : []), [job, lines]);
   const unusedCount = sentences.filter((s) => !s.used).length;
-
-  // Approval itself arrives with Days 11–15; the reasons are shown now (§14, §22).
-  const blockers = [
-    totals && totals.unpricedLines > 0 && `${totals.unpricedLines} line${totals.unpricedLines > 1 ? "s" : ""} need a price`,
-    !quote?.customerId && "no customer on the quote",
-    lines.length === 0 && "no lines",
-    dirty && "unsaved changes",
-    "approval and sending arrive in the next build step",
-  ].filter(Boolean) as string[];
 
   if (!quote) return <Shell><ErrorNote error={error} />{!error && <p className="text-sm text-slate-500">Loading…</p>}</Shell>;
 
@@ -131,7 +134,7 @@ export default function Review() {
           <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 align-middle text-xs font-medium">{quote.status}</span></h1>
         <div className="flex gap-2">
           <button className={btnGhost} onClick={load} disabled={saving}>Reload</button>
-          <button className={btnPrimary} onClick={save} disabled={!dirty || saving || anyInvalid}>{saving ? "Saving…" : "Save draft"}</button>
+          {!locked && <button className={btnPrimary} onClick={save} disabled={!dirty || saving || anyInvalid}>{saving ? "Saving…" : "Save draft"}</button>}
         </div>
       </div>
       <ErrorNote error={error} />
@@ -169,6 +172,8 @@ export default function Review() {
         </section>
 
         <section className={`${tab === "quote" ? "" : "hidden"} md:block`}>
+          <CustomerPicker value={customerId} locked={locked} onPick={(c) => { setCustomerId(c); setDirty(true); }} />
+          <fieldset disabled={locked} className="min-w-0">
           <ul className="space-y-2">
             {lines.map((l, i) => {
               const firstOfGroup = l.groupKey && groups.get(l.groupKey)![0]!.key === l.key;
@@ -217,11 +222,13 @@ export default function Review() {
               );
             })}
           </ul>
-          <button className={`${btnGhost} mt-3`} onClick={addLine}>+ Add line</button>
+          {!locked && <button className={`${btnGhost} mt-3`} onClick={addLine}>+ Add line</button>}
 
           <div className="mt-6 rounded-lg border bg-white p-4 text-sm">
             <div className="flex items-center justify-between gap-3"><span>Discount</span>
               <input aria-label="Discount" inputMode="decimal" className={`${input} w-28 text-right ${discountCents === "invalid" ? "border-rose-400" : ""}`} value={discount} onChange={(e) => { setDiscount(e.target.value); setDirty(true); }} placeholder="0.00" /></div>
+            <div className="mt-2 flex items-center justify-between gap-3"><span>Deposit %</span>
+              <input aria-label="Deposit percent" inputMode="numeric" className={`${input} w-28 text-right ${depositValid ? "" : "border-rose-400"}`} value={deposit} onChange={(e) => { setDeposit(e.target.value); setDirty(true); }} /></div>
             {totals && (
               <dl className="mt-3 space-y-1 tabular-nums">
                 <Row label="Subtotal" value={money(totals.subtotalCents)} />
@@ -234,10 +241,8 @@ export default function Review() {
             )}
           </div>
 
-          <div className="mt-4">
-            <button className={`${btnPrimary} w-full`} disabled title={blockers.join("; ")}>Approve</button>
-            <ul className="mt-2 list-disc pl-5 text-xs text-slate-500">{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
-          </div>
+          </fieldset>
+          <QuoteActions quote={quote} dirty={dirty} onChange={load} />
           {quote.jobId && <p className="mt-4 text-xs"><Link className="text-teal-700" href="/jobs">← Back to jobs</Link></p>}
         </section>
       </div>

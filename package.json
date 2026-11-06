@@ -20,7 +20,9 @@
     "spike:inbound": "pnpm --filter @qa/spikes inbound",
     "eval": "pnpm --filter @qa/api eval",
     "dev:worker": "pnpm --filter @qa/api worker",
-    "dev:web": "pnpm --filter @qa/web dev"
+    "dev:web": "pnpm --filter @qa/web dev",
+    "backup": "pnpm --filter @qa/api backup",
+    "backup:restore-test": "pnpm --filter @qa/api backup:restore-test"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

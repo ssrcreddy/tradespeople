@@ -47,6 +47,20 @@ describe("auth and business onboarding", () => {
   });
 });
 
+describe("health", () => {
+  it("reports queue age and last webhook without auth, and fails when the queue is stuck", async () => {
+    const ok = await t.app.inject({ method: "GET", url: "/health" });
+    expect(ok.statusCode).toBe(200);
+    expect(JSON.parse(ok.body)).toMatchObject({ ok: true, queueDepth: expect.any(Number), oldestQueuedSeconds: expect.any(Number) });
+    await t.boss.send("notify", { stuck: true });
+    await t.admin.query(`update pgboss.job set created_on = now() - interval '20 minutes' where name = 'notify' and data->>'stuck' = 'true'`);
+    const bad = await t.app.inject({ method: "GET", url: "/health" });
+    expect(bad.statusCode).toBe(503);
+    expect(JSON.parse(bad.body).ok).toBe(false);
+    await t.boss.deleteAllJobs("notify");
+  });
+});
+
 describe("price book", () => {
   let c: Client;
   beforeAll(async () => { c = await signUpWithBusiness(t.app, "pb"); });

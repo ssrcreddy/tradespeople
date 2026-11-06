@@ -12,6 +12,7 @@ export function Shell({ children, title }: { children: React.ReactNode; title?: 
         <Link href="/jobs" className="font-semibold tracking-tight">Quotes</Link>
         <nav className="flex gap-4 text-sm text-slate-600">
           <Link href="/jobs">Jobs</Link>
+          <Link href="/invoices">Invoices</Link>
           <button onClick={async () => { await fetch("/api/auth/sign-out", { method: "POST" }); location.href = "/login"; }}>Sign out</button>
         </nav>
       </header>

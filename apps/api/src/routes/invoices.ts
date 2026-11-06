@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import { invoiceNumber } from "@qa/shared";
 import type { Deps } from "../app.ts";
 import type { makeGuards } from "../http/context.ts";
 import { withTenant } from "../db/client.ts";
@@ -29,6 +30,6 @@ export const invoiceRoutes = ({ db, boss, store }: Deps, g: Guards): FastifyPlug
         .where(and(eq(invoices.businessId, t.businessId), eq(invoices.id, id))));
     if (!i?.key) throw notFound("PDF");
     const o = await store.get(i.key);
-    return reply.type("application/pdf").header("content-disposition", `attachment; filename="Invoice-${i.number}.pdf"`).send(o.body);
+    return reply.type("application/pdf").header("content-disposition", `attachment; filename="Invoice-${invoiceNumber(i.number)}.pdf"`).send(o.body);
   });
 };

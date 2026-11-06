@@ -54,6 +54,44 @@ Integration tests create a throwaway `quotes_test` database. CI
 plus the isolation suites a second time with RLS bypassed
 (`TEST_BYPASS_RLS=1`) to prove the code-level tenant filters on their own.
 
+## Days 11–15 — status (2026-11-05)
+
+Quote and invoice lifecycle end to end. All status changes go through the two
+state machines in `apps/api/src/services/transitions.ts`.
+
+| Area | What exists |
+|---|---|
+| Approval | All blockers reported at once, authoritative recompute, frozen snapshot, plan limit counted once per quote. |
+| Sending | `approved → sending` under a row lock; PDF rendered once and stored; the stored bytes are emailed with Reply-To and a content-bound idempotency key; failure goes back to `approved` with the error shown. |
+| No-email customers | Download the PDF and mark as sent, for quotes and invoices. |
+| Delivery events | `POST /webhooks/resend/events`: bounces and complaints block the address and bounces notify the owner. |
+| Outcome | Accept (with chosen optional lines, at the quoted tax rates), decline, revise to the next version, daily expiry sweep. |
+| Invoices | Deposit + final that sum to the quote exactly, due date set on send, partial payments, reversals, derived overdue. |
+| Reminders | +7 and +14 days at 09:00 business-local, re-checked at fire time, balance stated. |
+| Ops | `/health` (queue age, last webhook), Sentry when `SENTRY_DSN` is set, `pnpm backup`, `pnpm backup:restore-test`. |
+| Web | Approve / send / share / outcome / revise / invoice actions on the review screen, customer picker, invoice list and detail with payments. |
+
+Exit test (`documents.test.ts`): message → draft → approve → sent PDF → accepted →
+deposit → final → partial payment → reminder → paid, every illegal (from, to) pair
+refused, and a send retried after a crash emails once. Real email has not been
+exercised: tests use a fake mailer that honours idempotency keys like Resend does.
+
+`pnpm dev:api` and `pnpm dev:worker` don't auto-restart: restart them after code changes.
+
+Set up before pilots: nightly `pnpm backup` on the host's scheduler, an external
+uptime monitor on `/health`, and a Resend webhook for `email.delivered`,
+`email.bounced`, `email.complained` pointing at `/webhooks/resend/events`.
+
+### API added
+
+| Route | |
+|---|---|
+| `POST /quotes/:id/approve` | `{ lockVersion }`; 422 with `details.blockers` |
+| `POST /quotes/:id/send`, `/share`, `GET /quotes/:id/pdf` | email, or download and mark as sent |
+| `POST /quotes/:id/outcome`, `/revise`, `/convert` | `{ outcome, acceptedOptionalLineIds }`; `{ kind: "deposit" \| "final" }` |
+| `GET /invoices`, `GET /invoices/:id`, `POST /invoices/:id/send`, `/share`, `/payments`, `GET /invoices/:id/pdf` | invoices and payments |
+| `POST /webhooks/resend/events` | delivery events |
+
 ## Days 6–10 — status (2026-11-02)
 
 | Area | What exists |
@@ -80,8 +118,7 @@ names ("GFCI receptacle, 15 A") — it now also scores the core name; pasted
 forwards weren't parsed for the customer's address; quoted reply text was being
 dropped; "not used" shading flagged headers and greetings.
 
-Not yet: price-book editing screen and full onboarding (Days 16–21);
-approval, PDF, sending, invoices (Days 11–15).
+Not yet: price-book editing screen and full onboarding (Days 16–21).
 
 ## Days 2–5 — status (2026-11-01)
 
