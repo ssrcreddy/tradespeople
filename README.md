@@ -43,6 +43,37 @@ Node 24 is pinned (`.nvmrc`, `engines`); pnpm 10. Postgres uses host port
 56432 because native and other-project Postgres instances often hold 5432–5433.
 `BETTER_AUTH_SECRET` in `.env` must be at least 32 characters.
 
+## Start and stop the servers
+
+After the one-time setup above, start everything from the project folder. The
+API, worker and web app each keep running, so give each its own terminal:
+
+```bash
+pnpm dev:infra                # database and file storage (Docker must be running)
+pnpm migrate                  # safe to repeat; needed after pulling new migrations
+pnpm dev:api                  # terminal 1
+pnpm dev:worker               # terminal 2
+pnpm dev:web                  # terminal 3
+```
+
+Then open http://localhost:3000. Startup can take a minute or two on a busy machine.
+Check it with http://localhost:8080/health, which returns 503 while the queue has
+jobs waiting more than 10 minutes, for example when the worker isn't running.
+
+To stop, press `Ctrl+C` in each of the three terminals, then stop the containers:
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file .env stop
+```
+
+Your data stays in the Docker volumes, and `pnpm dev:infra` brings it back. Don't
+add `-v` to `docker compose down` unless you want to delete the local database and
+files. If you started the whole product in Docker (below), stop it with:
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file .env --profile app down
+```
+
 ## Tests
 
 ```bash
